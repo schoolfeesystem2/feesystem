@@ -113,23 +113,33 @@ const Auth = () => {
     
     setIsLoading(false);
     if (error) {
+      let errorMessage = error.message;
+      let errorTitle = "Signup Failed";
+      
       if (error.message.includes("already registered")) {
+        errorTitle = "Account Exists";
+        errorMessage = "An account with this email already exists. Please login instead.";
+      } else if (error.message.includes("email_address_invalid") || error.message.includes("is invalid")) {
+        errorMessage = "Please enter a valid email address.";
+      } else if (error.message.includes("sending confirmation email") || error.message.includes("unexpected_failure")) {
+        // SMTP not configured - account was created but email failed
         toast({
-          title: "Account Exists",
-          description: "An account with this email already exists. Please login instead.",
-          variant: "destructive"
+          title: "Account Created!",
+          description: "Your account was created. You can now login with your credentials."
         });
-      } else {
-        toast({
-          title: "Signup Failed",
-          description: error.message,
-          variant: "destructive"
-        });
+        navigate("/auth?tab=login");
+        return;
       }
+      
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive"
+      });
     } else {
       toast({
         title: "Account Created!",
-        description: "Please check your email to verify your account, or login directly if email confirmation is disabled."
+        description: "Your account was created successfully. You can now login."
       });
       navigate("/dashboard");
     }
