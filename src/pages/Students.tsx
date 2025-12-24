@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,51 +7,108 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 
 interface Student {
   id: string;
-  admission_no: string;
-  full_name: string;
+  name: string;
+  class_id: string | null;
   class_name: string;
-  parent_contact: string;
-  parent_name: string;
+  parent_name: string | null;
+  phone: string | null;
+  email: string | null;
+  status: string;
   total_fee: number;
+}
+
+interface ClassOption {
+  id: string;
+  name: string;
+  monthly_fee: number;
+  annual_fee: number;
 }
 
 const ITEMS_PER_PAGE = 10;
 
 const Students = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-
-  // Mock data
-  const [students, setStudents] = useState<Student[]>([
-    { id: "1", admission_no: "ADM001", full_name: "John Doe", class_name: "Grade 1", parent_contact: "+254 700 000 001", parent_name: "Jane Doe", total_fee: 50000 },
-    { id: "2", admission_no: "ADM002", full_name: "Jane Smith", class_name: "Grade 2", parent_contact: "+254 700 000 002", parent_name: "John Smith", total_fee: 55000 },
-    { id: "3", admission_no: "ADM003", full_name: "Michael Johnson", class_name: "Grade 3", parent_contact: "+254 700 000 003", parent_name: "Mary Johnson", total_fee: 60000 },
-    { id: "4", admission_no: "ADM004", full_name: "Sarah Williams", class_name: "Grade 1", parent_contact: "+254 700 000 004", parent_name: "Tom Williams", total_fee: 50000 },
-    { id: "5", admission_no: "ADM005", full_name: "David Brown", class_name: "Grade 4", parent_contact: "+254 700 000 005", parent_name: "Lisa Brown", total_fee: 65000 },
-  ]);
-
-  const classes = ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"];
+  const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    admission_no: "",
-    full_name: "",
-    class_name: "",
-    parent_contact: "",
+    name: "",
+    class_id: "",
     parent_name: "",
+    phone: "",
+    email: "",
   });
+
+  useEffect(() => {
+    if (user) {
+      fetchStudents();
+      fetchClasses();
+    }
+  }, [user]);
+
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*, classes(name, monthly_fee, annual_fee)')
+        .order('name');
+
+      if (error) throw error;
+
+      const formattedStudents = data?.map(s => {
+        const classData = s.classes as any;
+        return {
+          id: s.id,
+          name: s.name,
+          class_id: s.class_id,
+          class_name: classData?.name || 'Unassigned',
+          parent_name: s.parent_name,
+          phone: s.phone,
+          email: s.email,
+          status: s.status || 'active',
+          total_fee: (classData?.monthly_fee || 0) + (classData?.annual_fee || 0),
+        };
+      }) || [];
+
+      setStudents(formattedStudents);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('id, name, monthly_fee, annual_fee')
+        .order('name');
+
+      if (error) throw error;
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
+  };
 
   const filteredStudents = students.filter(
     (student) =>
-      student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.admission_no.toLowerCase().includes(searchTerm.toLowerCase())
+      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.class_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE);
@@ -61,13 +118,7 @@ const Students = () => {
   );
 
   const resetForm = () => {
-    setFormData({
-      admission_no: "",
-      full_name: "",
-      class_name: "",
-      parent_contact: "",
-      parent_name: "",
-    });
+    setFormData({ name: "", class_id: "", parent_name: "", phone: "", email: "" });
     setEditingStudent(null);
   };
 
@@ -75,11 +126,11 @@ const Students = () => {
     if (student) {
       setEditingStudent(student);
       setFormData({
-        admission_no: student.admission_no,
-        full_name: student.full_name,
-        class_name: student.class_name,
-        parent_contact: student.parent_contact,
-        parent_name: student.parent_name,
+        name: student.name,
+        class_id: student.class_id || "",
+        parent_name: student.parent_name || "",
+        phone: student.phone || "",
+        email: student.email || "",
       });
     } else {
       resetForm();
@@ -87,40 +138,76 @@ const Students = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.admission_no || !formData.full_name || !formData.class_name) {
+  const handleSave = async () => {
+    if (!formData.name) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please enter student name",
         variant: "destructive",
       });
       return;
     }
 
-    if (editingStudent) {
-      setStudents(students.map(s => 
-        s.id === editingStudent.id 
-          ? { ...s, ...formData }
-          : s
-      ));
-      toast({ title: "Success", description: "Student updated successfully" });
-    } else {
-      const newStudent: Student = {
-        id: Date.now().toString(),
-        ...formData,
-        total_fee: 50000,
-      };
-      setStudents([...students, newStudent]);
-      toast({ title: "Success", description: "Student added successfully" });
-    }
+    try {
+      if (editingStudent) {
+        const { error } = await supabase
+          .from('students')
+          .update({
+            name: formData.name,
+            class_id: formData.class_id || null,
+            parent_name: formData.parent_name || null,
+            phone: formData.phone || null,
+            email: formData.email || null,
+          })
+          .eq('id', editingStudent.id);
 
-    setIsDialogOpen(false);
-    resetForm();
+        if (error) throw error;
+        toast({ title: "Success", description: "Student updated successfully" });
+      } else {
+        const { error } = await supabase
+          .from('students')
+          .insert({
+            name: formData.name,
+            class_id: formData.class_id || null,
+            parent_name: formData.parent_name || null,
+            phone: formData.phone || null,
+            email: formData.email || null,
+            user_id: user?.id,
+          });
+
+        if (error) throw error;
+        toast({ title: "Success", description: "Student added successfully" });
+      }
+
+      setIsDialogOpen(false);
+      resetForm();
+      fetchStudents();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setStudents(students.filter(s => s.id !== id));
-    toast({ title: "Success", description: "Student deleted successfully" });
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast({ title: "Success", description: "Student deleted successfully" });
+      fetchStudents();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -162,30 +249,22 @@ const Students = () => {
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label>Admission Number *</Label>
-                      <Input
-                        value={formData.admission_no}
-                        onChange={(e) => setFormData({ ...formData, admission_no: e.target.value })}
-                        placeholder="ADM001"
-                      />
-                    </div>
-                    <div className="space-y-2">
                       <Label>Full Name *</Label>
                       <Input
-                        value={formData.full_name}
-                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="John Doe"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Class *</Label>
-                      <Select value={formData.class_name} onValueChange={(val) => setFormData({ ...formData, class_name: val })}>
+                      <Label>Class</Label>
+                      <Select value={formData.class_id} onValueChange={(val) => setFormData({ ...formData, class_id: val })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select class" />
                         </SelectTrigger>
                         <SelectContent>
                           {classes.map((cls) => (
-                            <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                            <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -199,11 +278,20 @@ const Students = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Parent Contact</Label>
+                      <Label>Phone</Label>
                       <Input
-                        value={formData.parent_contact}
-                        onChange={(e) => setFormData({ ...formData, parent_contact: e.target.value })}
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="+254 700 000 000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="parent@email.com"
                       />
                     </div>
                   </div>
@@ -221,7 +309,6 @@ const Students = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Adm No</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Class</TableHead>
                   <TableHead>Parent</TableHead>
@@ -231,26 +318,39 @@ const Students = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">{student.admission_no}</TableCell>
-                    <TableCell>{student.full_name}</TableCell>
-                    <TableCell>{student.class_name}</TableCell>
-                    <TableCell>{student.parent_name}</TableCell>
-                    <TableCell>{student.parent_contact}</TableCell>
-                    <TableCell>{formatCurrency(student.total_fee)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(student)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(student.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      Loading...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : paginatedStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No students found. Add your first student to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell>{student.class_name}</TableCell>
+                      <TableCell>{student.parent_name || "-"}</TableCell>
+                      <TableCell>{student.phone || "-"}</TableCell>
+                      <TableCell>{formatCurrency(student.total_fee)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(student)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(student.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

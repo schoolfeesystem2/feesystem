@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   LayoutDashboard, 
   Users, 
@@ -11,7 +12,8 @@ import {
   Phone, 
   LogOut,
   Menu,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
 import { cn } from "@/lib/utils";
@@ -19,7 +21,9 @@ import { cn } from "@/lib/utils";
 const MainLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -31,7 +35,9 @@ const MainLayout = () => {
     { icon: Phone, label: "Contact", path: "/contact" },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    await signOut();
     navigate("/");
   };
 
@@ -96,9 +102,14 @@ const MainLayout = () => {
               variant="ghost" 
               className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50"
               onClick={handleLogout}
+              disabled={loggingOut}
             >
-              <LogOut className="h-5 w-5" />
-              <span>Logout</span>
+              {loggingOut ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <LogOut className="h-5 w-5" />
+              )}
+              <span>{loggingOut ? "Logging out..." : "Logout"}</span>
             </Button>
           </div>
         </div>
