@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,13 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
 
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { signIn, signUp, resetPassword, user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -29,12 +31,17 @@ const Auth = () => {
     password: "",
     confirmPassword: "",
     schoolName: "",
-    schoolAddress: "",
-    schoolPhone: ""
   });
 
   const searchParams = new URLSearchParams(location.search);
   const defaultTab = searchParams.get("tab") === "signup" ? "signup" : "login";
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !authLoading) {
+      navigate("/dashboard");
+    }
+  }, [user, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,21 +55,30 @@ const Auth = () => {
     }
     setIsLoading(true);
     
-    // Simulate login - in a real app, this would connect to a backend
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signIn(loginData.email, loginData.password);
+    
+    setIsLoading(false);
+    if (error) {
+      toast({
+        title: "Login Failed",
+        description: error.message === "Invalid login credentials" 
+          ? "Invalid email or password. Please try again."
+          : error.message,
+        variant: "destructive"
+      });
+    } else {
       toast({
         title: "Welcome!",
         description: "Successfully logged in"
       });
       navigate("/dashboard");
-    }, 1000);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!signupData.email || !signupData.password || !signupData.confirmPassword || !signupData.schoolName || !signupData.schoolAddress || !signupData.schoolPhone) {
+    if (!signupData.email || !signupData.password || !signupData.confirmPassword || !signupData.schoolName) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -91,15 +107,32 @@ const Auth = () => {
 
     setIsLoading(true);
     
-    // Simulate signup - in a real app, this would connect to a backend
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signUp(signupData.email, signupData.password, {
+      school_name: signupData.schoolName,
+    });
+    
+    setIsLoading(false);
+    if (error) {
+      if (error.message.includes("already registered")) {
+        toast({
+          title: "Account Exists",
+          description: "An account with this email already exists. Please login instead.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Signup Failed",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    } else {
       toast({
-        title: "Success",
-        description: "Account created successfully!"
+        title: "Account Created!",
+        description: "Please check your email to verify your account, or login directly if email confirmation is disabled."
       });
       navigate("/dashboard");
-    }, 1000);
+    }
   };
 
   const handleSendResetLink = async () => {
@@ -114,17 +147,32 @@ const Auth = () => {
 
     setForgotLoading(true);
     
-    // Simulate reset email - in a real app, this would connect to a backend
-    setTimeout(() => {
-      setForgotLoading(false);
+    const { error } = await resetPassword(forgotEmail);
+    
+    setForgotLoading(false);
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
       toast({
         title: "Reset Link Sent",
         description: "Check your email for the password reset link"
       });
       setForgotPasswordOpen(false);
       setForgotEmail("");
-    }, 1000);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center gradient-auth p-4">
@@ -171,7 +219,12 @@ const Auth = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Signing in..." : "Sign In"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : "Sign In"}
                 </Button>
                 <div className="text-center">
                   <button
@@ -231,30 +284,13 @@ const Auth = () => {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-school-address">School Address *</Label>
-                  <Input
-                    id="signup-school-address"
-                    type="text"
-                    placeholder="123 Education Street, City"
-                    value={signupData.schoolAddress}
-                    onChange={e => setSignupData({ ...signupData, schoolAddress: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-school-phone">Phone Number *</Label>
-                  <Input
-                    id="signup-school-phone"
-                    type="tel"
-                    placeholder="+254 700 000 000"
-                    value={signupData.schoolPhone}
-                    onChange={e => setSignupData({ ...signupData, schoolPhone: e.target.value })}
-                    required
-                  />
-                </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Creating account..." : "Create Account"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : "Create Account"}
                 </Button>
               </form>
             </TabsContent>
@@ -288,7 +324,12 @@ const Auth = () => {
               onClick={handleSendResetLink}
               disabled={forgotLoading}
             >
-              {forgotLoading ? "Sending..." : "Send Reset Link"}
+              {forgotLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : "Send Reset Link"}
             </Button>
           </div>
         </DialogContent>

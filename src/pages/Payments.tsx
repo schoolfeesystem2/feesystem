@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,49 +8,105 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Receipt, ChevronLeft, ChevronRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Plus, Search, Receipt, ChevronLeft, ChevronRight, Pencil, Download, FileSpreadsheet } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
 
 interface Payment {
   id: string;
+  student_id: string;
   student_name: string;
   amount: number;
   payment_date: string;
   payment_method: string;
-  receipt_number: string;
+  payment_type: string;
   notes: string;
+}
+
+interface Student {
+  id: string;
+  name: string;
 }
 
 const ITEMS_PER_PAGE = 10;
 
 const Payments = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [payments, setPayments] = useState<Payment[]>([
-    { id: "1", student_name: "John Doe", amount: 25000, payment_date: "2024-12-20", payment_method: "Cash", receipt_number: "RCP001", notes: "" },
-    { id: "2", student_name: "Jane Smith", amount: 15000, payment_date: "2024-12-19", payment_method: "M-Pesa", receipt_number: "RCP002", notes: "Partial payment" },
-    { id: "3", student_name: "Michael Johnson", amount: 30000, payment_date: "2024-12-18", payment_method: "Bank Transfer", receipt_number: "RCP003", notes: "" },
-    { id: "4", student_name: "Sarah Williams", amount: 20000, payment_date: "2024-12-17", payment_method: "Cash", receipt_number: "RCP004", notes: "" },
-    { id: "5", student_name: "David Brown", amount: 35000, payment_date: "2024-12-16", payment_method: "M-Pesa", receipt_number: "RCP005", notes: "Full payment" },
-  ]);
-
-  const students = ["John Doe", "Jane Smith", "Michael Johnson", "Sarah Williams", "David Brown"];
   const paymentMethods = ["Cash", "M-Pesa", "Bank Transfer", "Cheque"];
+  const paymentTypes = ["Tuition", "Transport", "Meals", "Uniform", "Books", "Other"];
 
   const [formData, setFormData] = useState({
-    student_name: "",
+    student_id: "",
     amount: "",
     payment_method: "",
+    payment_type: "",
     notes: "",
   });
+
+  useEffect(() => {
+    if (user) {
+      fetchPayments();
+      fetchStudents();
+    }
+  }, [user]);
+
+  const fetchPayments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*, students(name)')
+        .order('payment_date', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedPayments = data?.map(p => ({
+        id: p.id,
+        student_id: p.student_id,
+        student_name: (p.students as any)?.name || 'Unknown',
+        amount: p.amount,
+        payment_date: p.payment_date,
+        payment_method: p.payment_method || 'Cash',
+        payment_type: p.payment_type || 'Tuition',
+        notes: p.notes || '',
+      })) || [];
+
+      setPayments(formattedPayments);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('id, name')
+        .eq('status', 'active');
+
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  };
 
   const filteredPayments = payments.filter(
     (payment) =>
       payment.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.receipt_number.toLowerCase().includes(searchTerm.toLowerCase())
+      payment.payment_type.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredPayments.length / ITEMS_PER_PAGE);
@@ -61,8 +117,29 @@ const Payments = () => {
 
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
 
-  const handleSave = () => {
-    if (!formData.student_name || !formData.amount || !formData.payment_method) {
+  const resetForm = () => {
+    setFormData({ student_id: "", amount: "", payment_method: "", payment_type: "", notes: "" });
+    setEditingPayment(null);
+  };
+
+  const handleOpenDialog = (payment?: Payment) => {
+    if (payment) {
+      setEditingPayment(payment);
+      setFormData({
+        student_id: payment.student_id,
+        amount: payment.amount.toString(),
+        payment_method: payment.payment_method,
+        payment_type: payment.payment_type,
+        notes: payment.notes,
+      });
+    } else {
+      resetForm();
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!formData.student_id || !formData.amount || !formData.payment_method) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -71,20 +148,81 @@ const Payments = () => {
       return;
     }
 
-    const newPayment: Payment = {
-      id: Date.now().toString(),
-      student_name: formData.student_name,
-      amount: Number(formData.amount),
-      payment_date: new Date().toISOString().split('T')[0],
-      payment_method: formData.payment_method,
-      receipt_number: `RCP${String(payments.length + 1).padStart(3, '0')}`,
-      notes: formData.notes,
-    };
+    try {
+      if (editingPayment) {
+        const { error } = await supabase
+          .from('payments')
+          .update({
+            student_id: formData.student_id,
+            amount: Number(formData.amount),
+            payment_method: formData.payment_method,
+            payment_type: formData.payment_type || 'Tuition',
+            notes: formData.notes,
+          })
+          .eq('id', editingPayment.id);
 
-    setPayments([newPayment, ...payments]);
-    toast({ title: "Success", description: "Payment recorded successfully" });
-    setIsDialogOpen(false);
-    setFormData({ student_name: "", amount: "", payment_method: "", notes: "" });
+        if (error) throw error;
+        toast({ title: "Success", description: "Payment updated successfully" });
+      } else {
+        const { error } = await supabase
+          .from('payments')
+          .insert({
+            student_id: formData.student_id,
+            amount: Number(formData.amount),
+            payment_method: formData.payment_method,
+            payment_type: formData.payment_type || 'Tuition',
+            notes: formData.notes,
+            user_id: user?.id,
+          });
+
+        if (error) throw error;
+        toast({ title: "Success", description: "Payment recorded successfully" });
+      }
+
+      setIsDialogOpen(false);
+      resetForm();
+      fetchPayments();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportPDF = () => {
+    const data = {
+      title: "Payment History",
+      headers: ["Student", "Amount", "Method", "Type", "Date", "Notes"],
+      rows: filteredPayments.map(p => [
+        p.student_name,
+        formatCurrency(p.amount),
+        p.payment_method,
+        p.payment_type,
+        formatDate(p.payment_date),
+        p.notes || "-"
+      ]),
+    };
+    exportToPDF(data, "payments-report");
+    toast({ title: "Success", description: "PDF downloaded successfully" });
+  };
+
+  const handleExportExcel = () => {
+    const data = {
+      title: "Payments",
+      headers: ["Student", "Amount", "Method", "Type", "Date", "Notes"],
+      rows: filteredPayments.map(p => [
+        p.student_name,
+        p.amount,
+        p.payment_method,
+        p.payment_type,
+        p.payment_date,
+        p.notes || ""
+      ]),
+    };
+    exportToExcel(data, "payments-report");
+    toast({ title: "Success", description: "Excel file downloaded successfully" });
   };
 
   return (
@@ -128,7 +266,7 @@ const Payments = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between gap-4">
             <CardTitle>Payment History</CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -138,27 +276,35 @@ const Payments = () => {
                   className="pl-9 w-full sm:w-64"
                 />
               </div>
+              <Button variant="outline" onClick={handleExportPDF}>
+                <Download className="h-4 w-4 mr-2" /> PDF
+              </Button>
+              <Button variant="outline" onClick={handleExportExcel}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+              </Button>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button onClick={() => handleOpenDialog()}>
                     <Plus className="h-4 w-4 mr-2" /> Record Payment
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Record New Payment</DialogTitle>
-                    <DialogDescription>Enter the payment details below</DialogDescription>
+                    <DialogTitle>{editingPayment ? "Edit Payment" : "Record New Payment"}</DialogTitle>
+                    <DialogDescription>
+                      {editingPayment ? "Update the payment details" : "Enter the payment details below"}
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label>Student *</Label>
-                      <Select value={formData.student_name} onValueChange={(val) => setFormData({ ...formData, student_name: val })}>
+                      <Select value={formData.student_id} onValueChange={(val) => setFormData({ ...formData, student_id: val })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select student" />
                         </SelectTrigger>
                         <SelectContent>
                           {students.map((student) => (
-                            <SelectItem key={student} value={student}>{student}</SelectItem>
+                            <SelectItem key={student.id} value={student.id}>{student.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -186,6 +332,19 @@ const Payments = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
+                      <Label>Payment Type</Label>
+                      <Select value={formData.payment_type} onValueChange={(val) => setFormData({ ...formData, payment_type: val })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {paymentTypes.map((type) => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
                       <Label>Notes</Label>
                       <Textarea
                         value={formData.notes}
@@ -196,7 +355,7 @@ const Payments = () => {
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleSave}>Record Payment</Button>
+                    <Button onClick={handleSave}>{editingPayment ? "Update" : "Record"} Payment</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -208,25 +367,45 @@ const Payments = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Receipt #</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Method</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Notes</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedPayments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell className="font-medium">{payment.receipt_number}</TableCell>
-                    <TableCell>{payment.student_name}</TableCell>
-                    <TableCell className="text-success font-semibold">{formatCurrency(payment.amount)}</TableCell>
-                    <TableCell>{payment.payment_method}</TableCell>
-                    <TableCell>{formatDate(payment.payment_date)}</TableCell>
-                    <TableCell className="text-muted-foreground">{payment.notes || "-"}</TableCell>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Loading...
+                    </TableCell>
                   </TableRow>
-                ))}
+                ) : paginatedPayments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No payments found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedPayments.map((payment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell className="font-medium">{payment.student_name}</TableCell>
+                      <TableCell className="text-success font-semibold">{formatCurrency(payment.amount)}</TableCell>
+                      <TableCell>{payment.payment_method}</TableCell>
+                      <TableCell>{payment.payment_type}</TableCell>
+                      <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                      <TableCell className="text-muted-foreground max-w-32 truncate">{payment.notes || "-"}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(payment)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
