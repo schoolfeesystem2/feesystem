@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import ThemeToggle from "@/components/ThemeToggle";
 import { 
   LayoutDashboard, 
   Users, 
@@ -13,7 +14,8 @@ import {
   LogOut,
   Menu,
   X,
-  Loader2
+  Loader2,
+  CreditCard
 } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
 import { cn } from "@/lib/utils";
@@ -31,8 +33,9 @@ const MainLayout = () => {
     { icon: DollarSign, label: "Fee Structure", path: "/fee-structure" },
     { icon: Receipt, label: "Payments", path: "/payments" },
     { icon: BarChart3, label: "Reports", path: "/reports" },
+    { icon: CreditCard, label: "Billing", path: "/billing" },
     { icon: Settings, label: "Settings", path: "/settings" },
-    { icon: Phone, label: "Contact", path: "/contact" },
+    { icon: Phone, label: "Contact Us", path: "/contact" },
   ];
 
   const handleLogout = async () => {
@@ -51,6 +54,11 @@ const MainLayout = () => {
         {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
+      {/* Theme toggle for mobile */}
+      <div className="lg:hidden fixed top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
+
       {/* Overlay */}
       {sidebarOpen && (
         <div 
@@ -66,11 +74,14 @@ const MainLayout = () => {
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="p-6 border-b border-sidebar-border">
+          <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
             <Link to="/dashboard" className="flex items-center gap-3">
               <img src={appIcon} alt="School Fee System" className="h-10 w-10" />
               <span className="font-bold text-lg">School Fee</span>
             </Link>
+            <div className="hidden lg:block">
+              <ThemeToggle />
+            </div>
           </div>
 
           {/* Navigation */}

@@ -21,6 +21,8 @@ const Settings = () => {
 
   const [schoolData, setSchoolData] = useState({
     school_name: "",
+    school_address: "",
+    school_phone: "",
     school_email: "",
   });
 
@@ -34,7 +36,7 @@ const Settings = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('school_name, email')
+        .select('school_name, school_address, school_phone, email')
         .eq('id', user?.id)
         .maybeSingle();
 
@@ -43,6 +45,8 @@ const Settings = () => {
       if (data) {
         setSchoolData({
           school_name: data.school_name || '',
+          school_address: data.school_address || '',
+          school_phone: data.school_phone || '',
           school_email: data.email || user?.email || '',
         });
       }
@@ -62,6 +66,8 @@ const Settings = () => {
         .from('profiles')
         .update({
           school_name: schoolData.school_name,
+          school_address: schoolData.school_address,
+          school_phone: schoolData.school_phone,
         })
         .eq('id', user?.id);
 
@@ -163,7 +169,7 @@ const Settings = () => {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* School Settings */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Building className="h-5 w-5 text-primary" />
@@ -173,25 +179,45 @@ const Settings = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUpdateSchool} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="school_name">School Name</Label>
-                <Input
-                  id="school_name"
-                  value={schoolData.school_name}
-                  onChange={(e) => setSchoolData({ ...schoolData, school_name: e.target.value })}
-                  placeholder="Enter school name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="school_email">Email</Label>
-                <Input
-                  id="school_email"
-                  type="email"
-                  value={schoolData.school_email}
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="school_name">School Name</Label>
+                  <Input
+                    id="school_name"
+                    value={schoolData.school_name}
+                    onChange={(e) => setSchoolData({ ...schoolData, school_name: e.target.value })}
+                    placeholder="Enter school name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="school_email">Email Address</Label>
+                  <Input
+                    id="school_email"
+                    type="email"
+                    value={schoolData.school_email}
+                    disabled
+                    className="bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="school_phone">Phone Number</Label>
+                  <Input
+                    id="school_phone"
+                    value={schoolData.school_phone}
+                    onChange={(e) => setSchoolData({ ...schoolData, school_phone: e.target.value })}
+                    placeholder="+254 700 000 000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="school_address">Address</Label>
+                  <Input
+                    id="school_address"
+                    value={schoolData.school_address}
+                    onChange={(e) => setSchoolData({ ...schoolData, school_address: e.target.value })}
+                    placeholder="School address"
+                  />
+                </div>
               </div>
               <Button type="submit" disabled={loading}>
                 {loading ? (
@@ -206,7 +232,7 @@ const Settings = () => {
         </Card>
 
         {/* Password Settings */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Lock className="h-5 w-5 text-primary" />
@@ -216,25 +242,27 @@ const Settings = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUpdatePassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  />
+                </div>
               </div>
               <Button type="submit" disabled={loading}>
                 {loading ? (

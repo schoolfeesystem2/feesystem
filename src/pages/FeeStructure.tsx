@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,38 +7,57 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, DollarSign } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Plus, Pencil, Trash2, DollarSign, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 
 interface FeeStructure {
   id: string;
-  class_name: string;
-  fee_amount: number;
-  description: string;
+  name: string;
+  monthly_fee: number;
+  annual_fee: number;
 }
 
 const FeeStructure = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(null);
-
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([
-    { id: "1", class_name: "Grade 1", fee_amount: 50000, description: "Term 1 fees for Grade 1" },
-    { id: "2", class_name: "Grade 2", fee_amount: 55000, description: "Term 1 fees for Grade 2" },
-    { id: "3", class_name: "Grade 3", fee_amount: 60000, description: "Term 1 fees for Grade 3" },
-    { id: "4", class_name: "Grade 4", fee_amount: 65000, description: "Term 1 fees for Grade 4" },
-    { id: "5", class_name: "Grade 5", fee_amount: 70000, description: "Term 1 fees for Grade 5" },
-    { id: "6", class_name: "Grade 6", fee_amount: 75000, description: "Term 1 fees for Grade 6" },
-  ]);
+  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
-    class_name: "",
-    fee_amount: "",
-    description: "",
+    name: "",
+    monthly_fee: "",
+    annual_fee: "",
   });
 
+  useEffect(() => {
+    if (user) {
+      fetchFeeStructures();
+    }
+  }, [user]);
+
+  const fetchFeeStructures = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('id, name, monthly_fee, annual_fee')
+        .order('name');
+
+      if (error) throw error;
+      setFeeStructures(data || []);
+    } catch (error) {
+      console.error('Error fetching fee structures:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
-    setFormData({ class_name: "", fee_amount: "", description: "" });
+    setFormData({ name: "", monthly_fee: "", annual_fee: "" });
     setEditingStructure(null);
   };
 
@@ -46,9 +65,9 @@ const FeeStructure = () => {
     if (structure) {
       setEditingStructure(structure);
       setFormData({
-        class_name: structure.class_name,
-        fee_amount: structure.fee_amount.toString(),
-        description: structure.description,
+        name: structure.name,
+        monthly_fee: structure.monthly_fee.toString(),
+        annual_fee: structure.annual_fee.toString(),
       });
     } else {
       resetForm();
@@ -56,8 +75,8 @@ const FeeStructure = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.class_name || !formData.fee_amount) {
+  const handleSave = async () => {
+    if (!formData.name || !formData.monthly_fee) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -66,34 +85,83 @@ const FeeStructure = () => {
       return;
     }
 
-    if (editingStructure) {
-      setFeeStructures(feeStructures.map(f =>
-        f.id === editingStructure.id
-          ? { ...f, class_name: formData.class_name, fee_amount: Number(formData.fee_amount), description: formData.description }
-          : f
-      ));
-      toast({ title: "Success", description: "Fee structure updated successfully" });
-    } else {
-      const newStructure: FeeStructure = {
-        id: Date.now().toString(),
-        class_name: formData.class_name,
-        fee_amount: Number(formData.fee_amount),
-        description: formData.description,
-      };
-      setFeeStructures([...feeStructures, newStructure]);
-      toast({ title: "Success", description: "Fee structure added successfully" });
+    setSaving(true);
+    try {
+      if (editingStructure) {
+        const { error } = await supabase
+          .from('classes')
+          .update({
+            name: formData.name,
+            monthly_fee: Number(formData.monthly_fee),
+            annual_fee: Number(formData.annual_fee) || 0,
+          })
+          .eq('id', editingStructure.id);
+
+        if (error) throw error;
+        toast({ title: "Success", description: "Fee structure updated successfully" });
+      } else {
+        const { error } = await supabase
+          .from('classes')
+          .insert({
+            name: formData.name,
+            monthly_fee: Number(formData.monthly_fee),
+            annual_fee: Number(formData.annual_fee) || 0,
+            user_id: user?.id,
+          });
+
+        if (error) throw error;
+        toast({ title: "Success", description: "Fee structure added successfully" });
+      }
+
+      await fetchFeeStructures();
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
-
-    setIsDialogOpen(false);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    setFeeStructures(feeStructures.filter(f => f.id !== id));
-    toast({ title: "Success", description: "Fee structure deleted successfully" });
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast({ title: "Success", description: "Fee structure deleted successfully" });
+      await fetchFeeStructures();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const totalFees = feeStructures.reduce((sum, f) => sum + f.fee_amount, 0);
+  const totalMonthlyFees = feeStructures.reduce((sum, f) => sum + f.monthly_fee, 0);
+  const totalAnnualFees = feeStructures.reduce((sum, f) => sum + f.annual_fee, 0);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <DollarSign className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">Fee Structure</h1>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -105,32 +173,34 @@ const FeeStructure = () => {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Classes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{feeStructures.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Average Fee</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalFees / feeStructures.length || 0)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Highest Fee</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(Math.max(...feeStructures.map(f => f.fee_amount), 0))}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {feeStructures.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Classes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{feeStructures.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Average Monthly Fee</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalMonthlyFees / feeStructures.length || 0)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Highest Monthly Fee</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(Math.max(...feeStructures.map(f => f.monthly_fee), 0))}</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -153,67 +223,86 @@ const FeeStructure = () => {
                   <div className="space-y-2">
                     <Label>Class Name *</Label>
                     <Input
-                      value={formData.class_name}
-                      onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Grade 1"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Fee Amount (KES) *</Label>
+                    <Label>Monthly Fee (KES) *</Label>
                     <Input
                       type="number"
-                      value={formData.fee_amount}
-                      onChange={(e) => setFormData({ ...formData, fee_amount: e.target.value })}
-                      placeholder="50000"
+                      value={formData.monthly_fee}
+                      onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })}
+                      placeholder="5000"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Term 1 fees including tuition, meals, and activities"
+                    <Label>Annual Fee (KES)</Label>
+                    <Input
+                      type="number"
+                      value={formData.annual_fee}
+                      onChange={(e) => setFormData({ ...formData, annual_fee: e.target.value })}
+                      placeholder="50000"
                     />
                   </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleSave}>{editingStructure ? "Update" : "Add"}</Button>
+                  <Button onClick={handleSave} disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : editingStructure ? "Update" : "Add"}
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Class</TableHead>
-                <TableHead>Fee Amount</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {feeStructures.map((structure) => (
-                <TableRow key={structure.id}>
-                  <TableCell className="font-medium">{structure.class_name}</TableCell>
-                  <TableCell className="text-primary font-semibold">{formatCurrency(structure.fee_amount)}</TableCell>
-                  <TableCell className="text-muted-foreground">{structure.description}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(structure)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(structure.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {feeStructures.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Monthly Fee</TableHead>
+                  <TableHead>Annual Fee</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {feeStructures.map((structure) => (
+                  <TableRow key={structure.id}>
+                    <TableCell className="font-medium">{structure.name}</TableCell>
+                    <TableCell className="text-primary font-semibold">{formatCurrency(structure.monthly_fee)}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatCurrency(structure.annual_fee)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(structure)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(structure.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-12">
+              <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Fee Structures Yet</h3>
+              <p className="text-muted-foreground mb-4">Add your first class fee structure to get started.</p>
+              <Button onClick={() => handleOpenDialog()}>
+                <Plus className="h-4 w-4 mr-2" /> Add Fee Structure
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

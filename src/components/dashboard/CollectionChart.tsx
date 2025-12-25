@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -8,77 +8,171 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { TrendingUp, Calendar } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 type TimeRange = "30days" | "2months" | "3months" | "6months" | "1year" | "custom";
 
-interface CollectionChartProps {
-  data?: { date: string; collected: number; expected: number }[];
+interface ChartDataPoint {
+  date: string;
+  collected: number;
+  expected: number;
 }
 
-const generateMockData = (range: TimeRange, customDays?: number) => {
-  const data = [];
-  let days = 30;
-  
-  switch (range) {
-    case "30days": days = 30; break;
-    case "2months": days = 60; break;
-    case "3months": days = 90; break;
-    case "6months": days = 180; break;
-    case "1year": days = 365; break;
-    case "custom": days = customDays || 30; break;
-  }
+interface CollectionChartProps {
+  onMonthlyDataChange?: (data: { month: string; collected: number; expected: number }[]) => void;
+}
 
-  const groupBy = days > 90 ? "month" : days > 30 ? "week" : "day";
-  const baseCollected = 50000;
-  const baseExpected = 80000;
-
-  if (groupBy === "month") {
-    const months = Math.ceil(days / 30);
-    for (let i = months - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      data.push({
-        date: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-        collected: Math.floor(baseCollected * (0.7 + Math.random() * 0.6) * 4),
-        expected: baseExpected * 4,
-      });
-    }
-  } else if (groupBy === "week") {
-    const weeks = Math.ceil(days / 7);
-    for (let i = weeks - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i * 7);
-      data.push({
-        date: `Week ${weeks - i}`,
-        collected: Math.floor(baseCollected * (0.7 + Math.random() * 0.6)),
-        expected: baseExpected,
-      });
-    }
-  } else {
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      data.push({
-        date: date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
-        collected: Math.floor((baseCollected / 30) * (0.5 + Math.random())),
-        expected: baseExpected / 30,
-      });
-    }
-  }
-
-  return data;
-};
-
-const CollectionChart = ({ data }: CollectionChartProps) => {
+const CollectionChart = ({ onMonthlyDataChange }: CollectionChartProps) => {
+  const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<TimeRange>("30days");
   const [customDays, setCustomDays] = useState("30");
   const [chartType, setChartType] = useState<"area" | "bar">("area");
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const chartData = data || generateMockData(timeRange, Number(customDays));
+  useEffect(() => {
+    if (user) {
+      fetchChartData();
+    }
+  }, [user, timeRange, customDays]);
+
+  const fetchChartData = async () => {
+    setLoading(true);
+    try {
+      let days = 30;
+      switch (timeRange) {
+        case "30days": days = 30; break;
+        case "2months": days = 60; break;
+        case "3months": days = 90; break;
+        case "6months": days = 180; break;
+        case "1year": days = 365; break;
+        case "custom": days = Number(customDays) || 30; break;
+      }
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      // Fetch payments within the date range
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payments')
+        .select('amount, payment_date')
+        .gte('payment_date', startDate.toISOString().split('T')[0])
+        .order('payment_date', { ascending: true });
+
+      if (paymentsError) throw paymentsError;
+
+      // Fetch students with their class fees for expected calculation
+      const { data: students, error: studentsError } = await supabase
+        .from('students')
+        .select('id, class_id, classes(monthly_fee)')
+        .eq('status', 'active');
+
+      if (studentsError) throw studentsError;
+
+      const totalMonthlyExpected = students?.reduce((sum, s) => {
+        const classData = s.classes as any;
+        return sum + (classData?.monthly_fee || 0);
+      }, 0) || 0;
+
+      // Group data based on time range
+      const groupBy = days > 90 ? "month" : days > 30 ? "week" : "day";
+      const groupedData: { [key: string]: number } = {};
+
+      // Initialize groups
+      if (groupBy === "month") {
+        const months = Math.ceil(days / 30);
+        for (let i = months - 1; i >= 0; i--) {
+          const date = new Date();
+          date.setMonth(date.getMonth() - i);
+          const key = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+          groupedData[key] = 0;
+        }
+      } else if (groupBy === "week") {
+        const weeks = Math.ceil(days / 7);
+        for (let i = weeks - 1; i >= 0; i--) {
+          groupedData[`Week ${weeks - i}`] = 0;
+        }
+      } else {
+        for (let i = days - 1; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const key = date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+          groupedData[key] = 0;
+        }
+      }
+
+      // Aggregate payments
+      payments?.forEach(payment => {
+        const paymentDate = new Date(payment.payment_date);
+        let key = '';
+        
+        if (groupBy === "month") {
+          key = paymentDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        } else if (groupBy === "week") {
+          const weekNumber = Math.ceil((days - Math.floor((new Date().getTime() - paymentDate.getTime()) / (1000 * 60 * 60 * 24))) / 7);
+          key = `Week ${Math.max(1, weekNumber)}`;
+        } else {
+          key = paymentDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+        }
+
+        if (groupedData.hasOwnProperty(key)) {
+          groupedData[key] += payment.amount;
+        }
+      });
+
+      // Convert to chart data format
+      const formattedData = Object.entries(groupedData).map(([date, collected]) => {
+        let expected = totalMonthlyExpected;
+        if (groupBy === "week") expected = totalMonthlyExpected / 4;
+        if (groupBy === "day") expected = totalMonthlyExpected / 30;
+        
+        return {
+          date,
+          collected,
+          expected: Math.round(expected),
+        };
+      });
+
+      setChartData(formattedData);
+
+      // Generate 12-month data for analysis
+      if (onMonthlyDataChange) {
+        const monthlyData: { month: string; collected: number; expected: number }[] = [];
+        for (let i = 11; i >= 0; i--) {
+          const date = new Date();
+          date.setMonth(date.getMonth() - i);
+          const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+          
+          const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+          const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+          
+          const monthPayments = payments?.filter(p => {
+            const pDate = new Date(p.payment_date);
+            return pDate >= monthStart && pDate <= monthEnd;
+          }) || [];
+
+          const monthCollected = monthPayments.reduce((sum, p) => sum + p.amount, 0);
+
+          monthlyData.push({
+            month: monthKey,
+            collected: monthCollected,
+            expected: totalMonthlyExpected,
+          });
+        }
+        onMonthlyDataChange(monthlyData);
+      }
+
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalCollected = chartData.reduce((sum, d) => sum + d.collected, 0);
   const totalExpected = chartData.reduce((sum, d) => sum + d.expected, 0);
-  const growth = ((totalCollected / totalExpected) * 100).toFixed(1);
+  const growth = totalExpected > 0 ? ((totalCollected / totalExpected) * 100).toFixed(1) : "0";
 
   return (
     <Card className="col-span-full">
@@ -164,98 +258,110 @@ const CollectionChart = ({ data }: CollectionChartProps) => {
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            {chartType === "area" ? (
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0.1}/>
-                  </linearGradient>
-                  <linearGradient id="colorExpected" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(215, 85%, 35%)" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="hsl(215, 85%, 35%)" stopOpacity={0.05}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215, 20%, 88%)" />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fontSize: 12 }} 
-                  tickLine={false}
-                  axisLine={{ stroke: 'hsl(215, 20%, 88%)' }}
-                />
-                <YAxis 
-                  tick={{ fontSize: 12 }} 
-                  tickLine={false}
-                  axisLine={{ stroke: 'hsl(215, 20%, 88%)' }}
-                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
-                />
-                <Tooltip 
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{ 
-                    borderRadius: '8px', 
-                    border: '1px solid hsl(215, 20%, 88%)',
-                    boxShadow: '0 4px 6px -1px hsl(215 25% 15% / 0.1)'
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="expected" 
-                  stroke="hsl(215, 85%, 35%)" 
-                  strokeWidth={2}
-                  fillOpacity={1} 
-                  fill="url(#colorExpected)" 
-                  name="Expected"
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="collected" 
-                  stroke="hsl(142, 70%, 45%)" 
-                  strokeWidth={2}
-                  fillOpacity={1} 
-                  fill="url(#colorCollected)" 
-                  name="Collected"
-                />
-              </AreaChart>
-            ) : (
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215, 20%, 88%)" />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fontSize: 12 }} 
-                  tickLine={false}
-                  axisLine={{ stroke: 'hsl(215, 20%, 88%)' }}
-                />
-                <YAxis 
-                  tick={{ fontSize: 12 }} 
-                  tickLine={false}
-                  axisLine={{ stroke: 'hsl(215, 20%, 88%)' }}
-                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
-                />
-                <Tooltip 
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{ 
-                    borderRadius: '8px', 
-                    border: '1px solid hsl(215, 20%, 88%)',
-                    boxShadow: '0 4px 6px -1px hsl(215 25% 15% / 0.1)'
-                  }}
-                />
-                <Bar 
-                  dataKey="expected" 
-                  fill="hsl(215, 85%, 35%)" 
-                  opacity={0.3}
-                  name="Expected"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar 
-                  dataKey="collected" 
-                  fill="hsl(142, 70%, 45%)" 
-                  name="Collected"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            )}
-          </ResponsiveContainer>
+          {loading ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              Loading chart data...
+            </div>
+          ) : chartData.length === 0 || totalCollected === 0 ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              No payment data available. Start recording payments to see trends.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              {chartType === "area" ? (
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0.1}/>
+                    </linearGradient>
+                    <linearGradient id="colorExpected" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(215, 85%, 35%)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="hsl(215, 85%, 35%)" stopOpacity={0.05}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 12 }} 
+                    tickLine={false}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12 }} 
+                    tickLine={false}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => formatCurrency(value)}
+                    contentStyle={{ 
+                      borderRadius: '8px', 
+                      border: '1px solid hsl(var(--border))',
+                      backgroundColor: 'hsl(var(--popover))',
+                      color: 'hsl(var(--popover-foreground))'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="expected" 
+                    stroke="hsl(215, 85%, 35%)" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorExpected)" 
+                    name="Expected"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="collected" 
+                    stroke="hsl(142, 70%, 45%)" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorCollected)" 
+                    name="Collected"
+                  />
+                </AreaChart>
+              ) : (
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 12 }} 
+                    tickLine={false}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12 }} 
+                    tickLine={false}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => formatCurrency(value)}
+                    contentStyle={{ 
+                      borderRadius: '8px', 
+                      border: '1px solid hsl(var(--border))',
+                      backgroundColor: 'hsl(var(--popover))',
+                      color: 'hsl(var(--popover-foreground))'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="expected" 
+                    fill="hsl(215, 85%, 35%)" 
+                    opacity={0.3}
+                    name="Expected"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar 
+                    dataKey="collected" 
+                    fill="hsl(142, 70%, 45%)" 
+                    name="Collected"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          )}
         </div>
       </CardContent>
     </Card>
