@@ -31,6 +31,8 @@ const Auth = () => {
     password: "",
     confirmPassword: "",
     schoolName: "",
+    schoolAddress: "",
+    schoolPhone: "",
   });
 
   const searchParams = new URLSearchParams(location.search);
@@ -78,7 +80,7 @@ const Auth = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!signupData.email || !signupData.password || !signupData.confirmPassword || !signupData.schoolName) {
+    if (!signupData.email || !signupData.password || !signupData.confirmPassword || !signupData.schoolName || !signupData.schoolAddress || !signupData.schoolPhone) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -109,6 +111,8 @@ const Auth = () => {
     
     const { error } = await signUp(signupData.email, signupData.password, {
       school_name: signupData.schoolName,
+      school_address: signupData.schoolAddress,
+      school_phone: signupData.schoolPhone,
     });
     
     setIsLoading(false);
@@ -291,6 +295,28 @@ const Auth = () => {
                     placeholder="ABC Primary School"
                     value={signupData.schoolName}
                     onChange={e => setSignupData({ ...signupData, schoolName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-school-address">School Address *</Label>
+                  <Input
+                    id="signup-school-address"
+                    type="text"
+                    placeholder="123 School Road, City"
+                    value={signupData.schoolAddress}
+                    onChange={e => setSignupData({ ...signupData, schoolAddress: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-school-phone">School Phone *</Label>
+                  <Input
+                    id="signup-school-phone"
+                    type="tel"
+                    placeholder="+254 700 000 000"
+                    value={signupData.schoolPhone}
+                    onChange={e => setSignupData({ ...signupData, schoolPhone: e.target.value })}
                     required
                   />
                 </div>

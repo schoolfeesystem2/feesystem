@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import appIcon from "@/assets/app-icon.png";
 import MonthlyTargetCard from "@/components/dashboard/MonthlyTargetCard";
 import CollectionChart from "@/components/dashboard/CollectionChart";
+import MonthlyAnalysis from "@/components/dashboard/MonthlyAnalysis";
 
 interface DashboardStats {
   totalStudents: number;
@@ -34,6 +35,7 @@ const Dashboard = () => {
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
   const [monthlyTarget, setMonthlyTarget] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [monthlyAnalysisData, setMonthlyAnalysisData] = useState<{ month: string; collected: number; expected: number }[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -180,7 +182,10 @@ const Dashboard = () => {
       />
 
       {/* Collection Chart */}
-      <CollectionChart />
+      <CollectionChart onMonthlyDataChange={setMonthlyAnalysisData} />
+
+      {/* 12-Month Analysis */}
+      <MonthlyAnalysis data={monthlyAnalysisData} />
 
       {/* Recent Payments */}
       <Card>
