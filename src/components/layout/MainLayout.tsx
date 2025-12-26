@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import ThemeToggle from "@/components/ThemeToggle";
+import BroadcastNotification from "@/components/BroadcastNotification";
 import { 
   LayoutDashboard, 
   Users, 
@@ -48,6 +49,7 @@ const MainLayout = () => {
     <div className="min-h-screen bg-background flex overflow-x-hidden">
       {/* Mobile header with menu and theme toggle */}
       <div className="lg:hidden fixed top-4 right-4 z-50 flex items-center gap-2">
+        <BroadcastNotification />
         <ThemeToggle />
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -77,7 +79,8 @@ const MainLayout = () => {
               <img src={appIcon} alt="School Fee System" className="h-10 w-10" />
               <span className="font-bold text-lg">School Fee</span>
             </Link>
-            <div className="hidden lg:block">
+            <div className="hidden lg:flex items-center gap-2">
+              <BroadcastNotification />
               <ThemeToggle />
             </div>
           </div>
