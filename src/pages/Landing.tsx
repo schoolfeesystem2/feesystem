@@ -3,48 +3,32 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, DollarSign, BarChart3, Shield, ArrowRight, CheckCircle } from "lucide-react";
 import appIcon from "@/assets/app-icon.png";
-
 const Landing = () => {
-  const features = [
-    {
-      icon: Users,
-      title: "Student Management",
-      description: "Easily manage student records, enrollment, and fee assignments in one place."
-    },
-    {
-      icon: DollarSign,
-      title: "Fee Collection",
-      description: "Track payments, generate receipts, and monitor outstanding balances effortlessly."
-    },
-    {
-      icon: BarChart3,
-      title: "Financial Reports",
-      description: "Get detailed insights with monthly reports, analytics, and collection trends."
-    },
-    {
-      icon: Shield,
-      title: "Secure & Reliable",
-      description: "Your data is protected with enterprise-grade security and regular backups."
-    }
-  ];
-
-  const benefits = [
-    "Real-time dashboard with financial overview",
-    "Monthly target tracking and progress",
-    "Automated fee structure management",
-    "Payment history and receipt generation",
-    "Multi-class fee configuration",
-    "Subscription-based flexible plans"
-  ];
-
-  return (
-    <div className="min-h-screen gradient-hero">
+  const features = [{
+    icon: Users,
+    title: "Student Management",
+    description: "Easily manage student records, enrollment, and fee assignments in one place."
+  }, {
+    icon: DollarSign,
+    title: "Fee Collection",
+    description: "Track payments, generate receipts, and monitor outstanding balances effortlessly."
+  }, {
+    icon: BarChart3,
+    title: "Financial Reports",
+    description: "Get detailed insights with monthly reports, analytics, and collection trends."
+  }, {
+    icon: Shield,
+    title: "Secure & Reliable",
+    description: "Your data is protected with enterprise-grade security and regular backups."
+  }];
+  const benefits = ["Real-time dashboard with financial overview", "Monthly target tracking and progress", "Automated fee structure management", "Payment history and receipt generation", "Multi-class fee configuration", "Subscription-based flexible plans"];
+  return <div className="min-h-screen gradient-hero">
       {/* Header */}
       <header className="container mx-auto px-4 py-6">
         <nav className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
-            <span className="text-xl font-bold text-foreground">School Fee System</span>
+            <img alt="School Fee System" className="h-12 w-12 object-contain" src="/lovable-uploads/93b7a86f-59f4-47d7-8b9d-1f0a3fb8cbf5.png" />
+            <span className="text-xl font-bold text-foreground">SchoolFee System</span>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/auth">
@@ -96,7 +80,9 @@ const Landing = () => {
           </div>
 
           {/* Preview Card */}
-          <div className="relative animate-slide-in-right" style={{ animationDelay: "0.2s" }}>
+          <div className="relative animate-slide-in-right" style={{
+          animationDelay: "0.2s"
+        }}>
             <div className="bg-card border rounded-2xl shadow-xl overflow-hidden">
               <div className="bg-primary/10 px-6 py-4 border-b">
                 <div className="flex items-center gap-2">
@@ -137,7 +123,9 @@ const Landing = () => {
                     <span className="text-sm text-primary font-bold">78%</span>
                   </div>
                   <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: "78%" }} />
+                    <div className="progress-fill" style={{
+                    width: "78%"
+                  }} />
                   </div>
                 </div>
               </div>
@@ -155,8 +143,7 @@ const Landing = () => {
           </p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => (
-            <Card key={index} className="group interactive-card">
+          {features.map((feature, index) => <Card key={index} className="group interactive-card">
               <CardContent className="pt-6">
                 <div className="p-3 bg-primary/10 rounded-lg w-fit mb-4 group-hover:bg-primary/20 transition-colors">
                   <feature.icon className="h-6 w-6 text-primary" />
@@ -164,8 +151,7 @@ const Landing = () => {
                 <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground">{feature.description}</p>
               </CardContent>
-            </Card>
-          ))}
+            </Card>)}
         </div>
       </section>
 
@@ -181,16 +167,14 @@ const Landing = () => {
                 Join hundreds of schools that have streamlined their fee management process with our platform.
               </p>
               <div className="grid sm:grid-cols-2 gap-4">
-                {benefits.map((benefit, index) => (
-                  <div key={index} className="flex items-center gap-3">
+                {benefits.map((benefit, index) => <div key={index} className="flex items-center gap-3">
                     <CheckCircle className="h-5 w-5 text-success flex-shrink-0" />
                     <span className="text-sm text-foreground">{benefit}</span>
-                  </div>
-                ))}
+                  </div>)}
               </div>
             </div>
             <div className="flex justify-center">
-              <img src={appIcon} alt="School Fee System" className="h-48 w-48 object-contain opacity-80" />
+              <img alt="School Fee System" className="h-48 w-48 object-contain opacity-80" src="/lovable-uploads/f5537cea-b1f7-4eb1-848d-7cfaf481ed75.png" />
             </div>
           </div>
         </div>
@@ -225,8 +209,6 @@ const Landing = () => {
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default Landing;
