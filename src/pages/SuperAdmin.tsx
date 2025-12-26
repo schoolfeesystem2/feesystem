@@ -55,9 +55,37 @@ const SuperAdmin = () => {
   useEffect(() => {
     checkSuperAdminStatus();
   }, [user]);
+
+  // Set up realtime subscription for profiles updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('profiles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles'
+        },
+        (payload) => {
+          // Update the school in our local state
+          setSchools(prev => prev.map(school => 
+            school.id === payload.new.id 
+              ? { ...school, ...payload.new as School }
+              : school
+          ));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const checkSuperAdminStatus = async () => {
     if (!user) {
-      navigate('/auth');
+      navigate('/superadmin');
       return;
     }
     try {
@@ -72,14 +100,14 @@ const SuperAdmin = () => {
           description: "You don't have super admin privileges",
           variant: "destructive"
         });
-        navigate('/dashboard');
+        navigate('/superadmin');
         return;
       }
       setIsSuperAdmin(true);
       fetchSchools();
     } catch (error) {
       console.error('Error checking admin status:', error);
-      navigate('/dashboard');
+      navigate('/superadmin');
     }
   };
   const fetchSchools = async () => {

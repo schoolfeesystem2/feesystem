@@ -97,6 +97,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateLastActive = async (userId: string) => {
+    await supabase
+      .from('profiles')
+      .update({ last_active: new Date().toISOString() })
+      .eq('id', userId);
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
@@ -105,10 +112,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Defer subscription fetch
+        // Defer subscription fetch and update last active
         if (session?.user) {
           setTimeout(() => {
             fetchSubscription(session.user.id);
+            updateLastActive(session.user.id);
           }, 0);
         } else {
           setSubscription(null);
@@ -125,6 +133,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (session?.user) {
         fetchSubscription(session.user.id);
+        updateLastActive(session.user.id);
       }
     });
 
@@ -187,11 +196,11 @@ export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, navigate]);
 
-  // Redirect expired users to billing (unless already on billing, contact, settings, or superadmin)
+  // Redirect expired users to billing (unless already on billing, contact, settings, or superadmin paths)
   useEffect(() => {
     if (!loading && user && isExpired) {
-      const allowedPaths = ['/billing', '/contact', '/settings', '/superadmin'];
-      if (!allowedPaths.includes(location.pathname)) {
+      const allowedPaths = ['/billing', '/contact', '/settings', '/superadmin', '/superadmin/dashboard'];
+      if (!allowedPaths.some(path => location.pathname.startsWith(path))) {
         navigate('/billing');
       }
     }

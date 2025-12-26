@@ -18,6 +18,7 @@ import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import Contact from "./pages/Contact";
 import SuperAdmin from "./pages/SuperAdmin";
+import SuperAdminAuth from "./pages/SuperAdminAuth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,12 @@ const App = () => (
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/reset-password" element={<ResetPassword />} />
+              <Route path="/superadmin" element={<SuperAdminAuth />} />
+              <Route path="/superadmin/dashboard" element={
+                <ProtectedRoute>
+                  <SuperAdmin />
+                </ProtectedRoute>
+              } />
               <Route element={
                 <ProtectedRoute>
                   <MainLayout />
@@ -46,14 +53,9 @@ const App = () => (
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/billing" element={<Billing />} />
                 <Route path="/settings" element={<Settings />} />
-              <Route path="/contact" element={<Contact />} />
-            </Route>
-            <Route path="/superadmin" element={
-              <ProtectedRoute>
-                <SuperAdmin />
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={<NotFound />} />
+                <Route path="/contact" element={<Contact />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
         </BrowserRouter>
