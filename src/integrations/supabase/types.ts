@@ -124,6 +124,7 @@ export type Database = {
       students: {
         Row: {
           admission_date: string | null
+          admission_number: string | null
           class_id: string | null
           created_at: string
           email: string | null
@@ -137,6 +138,7 @@ export type Database = {
         }
         Insert: {
           admission_date?: string | null
+          admission_number?: string | null
           class_id?: string | null
           created_at?: string
           email?: string | null
@@ -150,6 +152,7 @@ export type Database = {
         }
         Update: {
           admission_date?: string | null
+          admission_number?: string | null
           class_id?: string | null
           created_at?: string
           email?: string | null

@@ -18,6 +18,7 @@ interface Payment {
   id: string;
   student_id: string;
   student_name: string;
+  admission_number: string | null;
   amount: number;
   payment_date: string;
   payment_method: string;
@@ -28,6 +29,7 @@ interface Payment {
 interface Student {
   id: string;
   name: string;
+  admission_number: string | null;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -44,13 +46,11 @@ const Payments = () => {
   const [loading, setLoading] = useState(true);
 
   const paymentMethods = ["Cash", "M-Pesa", "Bank Transfer", "Cheque"];
-  const paymentTypes = ["Tuition", "Transport", "Meals", "Uniform", "Books", "Other"];
 
   const [formData, setFormData] = useState({
     student_id: "",
     amount: "",
     payment_method: "",
-    payment_type: "",
     notes: "",
   });
 
@@ -65,7 +65,7 @@ const Payments = () => {
     try {
       const { data, error } = await supabase
         .from('payments')
-        .select('*, students(name)')
+        .select('*, students(name, admission_number)')
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
@@ -74,6 +74,7 @@ const Payments = () => {
         id: p.id,
         student_id: p.student_id,
         student_name: (p.students as any)?.name || 'Unknown',
+        admission_number: (p.students as any)?.admission_number || null,
         amount: p.amount,
         payment_date: p.payment_date,
         payment_method: p.payment_method || 'Cash',
@@ -93,7 +94,7 @@ const Payments = () => {
     try {
       const { data, error } = await supabase
         .from('students')
-        .select('id, name')
+        .select('id, name, admission_number')
         .eq('status', 'active');
 
       if (error) throw error;
@@ -106,7 +107,8 @@ const Payments = () => {
   const filteredPayments = payments.filter(
     (payment) =>
       payment.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.payment_type.toLowerCase().includes(searchTerm.toLowerCase())
+      payment.payment_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (payment.admission_number && payment.admission_number.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const totalPages = Math.ceil(filteredPayments.length / ITEMS_PER_PAGE);
@@ -118,7 +120,7 @@ const Payments = () => {
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
 
   const resetForm = () => {
-    setFormData({ student_id: "", amount: "", payment_method: "", payment_type: "", notes: "" });
+    setFormData({ student_id: "", amount: "", payment_method: "", notes: "" });
     setEditingPayment(null);
   };
 
@@ -129,7 +131,6 @@ const Payments = () => {
         student_id: payment.student_id,
         amount: payment.amount.toString(),
         payment_method: payment.payment_method,
-        payment_type: payment.payment_type,
         notes: payment.notes,
       });
     } else {
@@ -156,7 +157,6 @@ const Payments = () => {
             student_id: formData.student_id,
             amount: Number(formData.amount),
             payment_method: formData.payment_method,
-            payment_type: formData.payment_type || 'Tuition',
             notes: formData.notes,
           })
           .eq('id', editingPayment.id);
@@ -170,7 +170,6 @@ const Payments = () => {
             student_id: formData.student_id,
             amount: Number(formData.amount),
             payment_method: formData.payment_method,
-            payment_type: formData.payment_type || 'Tuition',
             notes: formData.notes,
             user_id: user?.id,
           });
@@ -194,12 +193,12 @@ const Payments = () => {
   const handleExportPDF = () => {
     const data = {
       title: "Payment History",
-      headers: ["Student", "Amount", "Method", "Type", "Date", "Notes"],
+      headers: ["Adm. No.", "Student", "Amount", "Method", "Date", "Notes"],
       rows: filteredPayments.map(p => [
+        p.admission_number || "-",
         p.student_name,
         formatCurrency(p.amount),
         p.payment_method,
-        p.payment_type,
         formatDate(p.payment_date),
         p.notes || "-"
       ]),
@@ -211,12 +210,12 @@ const Payments = () => {
   const handleExportExcel = () => {
     const data = {
       title: "Payments",
-      headers: ["Student", "Amount", "Method", "Type", "Date", "Notes"],
+      headers: ["Adm. No.", "Student", "Amount", "Method", "Date", "Notes"],
       rows: filteredPayments.map(p => [
+        p.admission_number || "",
         p.student_name,
         p.amount,
         p.payment_method,
-        p.payment_type,
         p.payment_date,
         p.notes || ""
       ]),
@@ -224,6 +223,9 @@ const Payments = () => {
     exportToExcel(data, "payments-report");
     toast({ title: "Success", description: "Excel file downloaded successfully" });
   };
+
+  // Get selected student for display
+  const selectedStudent = students.find(s => s.id === formData.student_id);
 
   return (
     <div className="space-y-6">
@@ -270,7 +272,7 @@ const Payments = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search payments..."
+                  placeholder="Search by name or admission no..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 w-full sm:w-64"
@@ -288,7 +290,7 @@ const Payments = () => {
                     <Plus className="h-4 w-4 mr-2" /> Record Payment
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                   <DialogHeader>
                     <DialogTitle>{editingPayment ? "Edit Payment" : "Record New Payment"}</DialogTitle>
                     <DialogDescription>
@@ -297,32 +299,52 @@ const Payments = () => {
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label>Student *</Label>
+                      <Label>Select Student *</Label>
                       <Select value={formData.student_id} onValueChange={(val) => setFormData({ ...formData, student_id: val })}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select student" />
+                          <SelectValue placeholder="Search and select student" />
                         </SelectTrigger>
                         <SelectContent>
                           {students.map((student) => (
-                            <SelectItem key={student.id} value={student.id}>{student.name}</SelectItem>
+                            <SelectItem key={student.id} value={student.id}>
+                              {student.admission_number ? `${student.admission_number} - ` : ''}{student.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {selectedStudent && (
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4 space-y-2">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Student Name:</span>
+                              <p className="font-medium">{selectedStudent.name}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Admission No:</span>
+                              <p className="font-medium">{selectedStudent.admission_number || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     <div className="space-y-2">
                       <Label>Amount (KES) *</Label>
                       <Input
                         type="number"
                         value={formData.amount}
                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                        placeholder="25000"
+                        placeholder="Enter amount"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Payment Method *</Label>
                       <Select value={formData.payment_method} onValueChange={(val) => setFormData({ ...formData, payment_method: val })}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select method" />
+                          <SelectValue placeholder="Select payment method" />
                         </SelectTrigger>
                         <SelectContent>
                           {paymentMethods.map((method) => (
@@ -332,24 +354,12 @@ const Payments = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Payment Type</Label>
-                      <Select value={formData.payment_type} onValueChange={(val) => setFormData({ ...formData, payment_type: val })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {paymentTypes.map((type) => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Notes</Label>
+                      <Label>Notes (Optional)</Label>
                       <Textarea
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                         placeholder="Additional notes..."
+                        rows={3}
                       />
                     </div>
                   </div>
@@ -367,10 +377,10 @@ const Payments = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Adm. No.</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Method</TableHead>
-                  <TableHead>Type</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead>Actions</TableHead>
@@ -392,10 +402,10 @@ const Payments = () => {
                 ) : (
                   paginatedPayments.map((payment) => (
                     <TableRow key={payment.id}>
+                      <TableCell className="font-mono text-sm">{payment.admission_number || "-"}</TableCell>
                       <TableCell className="font-medium">{payment.student_name}</TableCell>
                       <TableCell className="text-success font-semibold">{formatCurrency(payment.amount)}</TableCell>
                       <TableCell>{payment.payment_method}</TableCell>
-                      <TableCell>{payment.payment_type}</TableCell>
                       <TableCell>{formatDate(payment.payment_date)}</TableCell>
                       <TableCell className="text-muted-foreground max-w-32 truncate">{payment.notes || "-"}</TableCell>
                       <TableCell>
