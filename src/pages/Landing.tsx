@@ -93,7 +93,7 @@ const Landing = () => {
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex items-center gap-4 mb-6">
-                  <img src={appIcon} alt="App Icon" className="h-12 w-12" />
+                  <img alt="App Icon" className="h-12 w-12" src="/lovable-uploads/7618be0d-c73e-4e4a-b09c-fe722932788f.png" />
                   <div>
                     <h3 className="font-semibold text-foreground">Dashboard Overview</h3>
                     <p className="text-sm text-muted-foreground">Real-time financial data</p>
