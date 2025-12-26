@@ -59,6 +59,7 @@ const SuperAdmin = () => {
   const [managePlan, setManagePlan] = useState("Small");
   const [manageStatus, setManageStatus] = useState("trial");
   const [manageMaxStudents, setManageMaxStudents] = useState(200);
+  const [manageDuration, setManageDuration] = useState("1year");
 
   useEffect(() => {
     checkSuperAdminStatus();
@@ -135,7 +136,19 @@ const SuperAdmin = () => {
     setManagePlan(school.subscription_plan || "Small");
     setManageStatus(school.subscription_status || "trial");
     setManageMaxStudents(school.max_students || 200);
+    setManageDuration("1year");
     setManageDialogOpen(true);
+  };
+
+  const getDurationInMs = (duration: string) => {
+    switch (duration) {
+      case "1month": return 30 * 24 * 60 * 60 * 1000;
+      case "3months": return 90 * 24 * 60 * 60 * 1000;
+      case "6months": return 180 * 24 * 60 * 60 * 1000;
+      case "1year": return 365 * 24 * 60 * 60 * 1000;
+      case "2years": return 730 * 24 * 60 * 60 * 1000;
+      default: return 365 * 24 * 60 * 60 * 1000;
+    }
   };
 
   const handleSaveChanges = async () => {
@@ -150,7 +163,7 @@ const SuperAdmin = () => {
       };
       
       if (manageStatus === 'active') {
-        updateData.subscription_end_date = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+        updateData.subscription_end_date = new Date(Date.now() + getDurationInMs(manageDuration)).toISOString();
       }
 
       const { error } = await supabase
@@ -530,6 +543,22 @@ const SuperAdmin = () => {
                   onChange={(e) => setManageMaxStudents(Number(e.target.value))}
                   placeholder="200"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Plan Duration</Label>
+                <Select value={manageDuration} onValueChange={setManageDuration}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="1month">1 Month</SelectItem>
+                    <SelectItem value="3months">3 Months</SelectItem>
+                    <SelectItem value="6months">6 Months</SelectItem>
+                    <SelectItem value="1year">1 Year</SelectItem>
+                    <SelectItem value="2years">2 Years</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>
