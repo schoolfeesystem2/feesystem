@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Search, Receipt, ChevronLeft, ChevronRight, Pencil, Download, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, Receipt, ChevronLeft, ChevronRight, Pencil, Download, FileSpreadsheet, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
 
@@ -234,6 +234,23 @@ const Payments = () => {
         description: error.message,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('Are you sure you want to delete this payment record?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .eq('id', paymentId);
+
+      if (error) throw error;
+      toast({ title: "Success", description: "Payment deleted successfully" });
+      fetchPayments();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -478,9 +495,14 @@ const Payments = () => {
                       <TableCell>{formatDate(payment.payment_date)}</TableCell>
                       <TableCell className="text-muted-foreground max-w-32 truncate">{payment.notes || "-"}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(payment)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(payment)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeletePayment(payment.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
