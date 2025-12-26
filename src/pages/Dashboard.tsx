@@ -35,20 +35,39 @@ const Dashboard = () => {
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
   const [monthlyTarget, setMonthlyTarget] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [schoolName, setSchoolName] = useState("Dashboard");
   const [monthlyAnalysisData, setMonthlyAnalysisData] = useState<{ month: string; collected: number; expected: number }[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
+      fetchSchoolName();
     }
   }, [user]);
+
+  const fetchSchoolName = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('school_name')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) throw error;
+      if (data?.school_name) {
+        setSchoolName(data.school_name);
+      }
+    } catch (error) {
+      console.error('Error fetching school name:', error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
       // Fetch students count and classes for expected fees
       const { data: students, error: studentsError } = await supabase
         .from('students')
-        .select('id, class_id, classes(monthly_fee, annual_fee)')
+        .select('id, class_id, classes(monthly_fee)')
         .eq('status', 'active');
 
       if (studentsError) throw studentsError;
@@ -64,7 +83,7 @@ const Dashboard = () => {
       const totalStudents = students?.length || 0;
       const totalExpectedFees = students?.reduce((sum, s) => {
         const classData = s.classes as any;
-        return sum + (classData?.monthly_fee || 0) + (classData?.annual_fee || 0);
+        return sum + (classData?.monthly_fee || 0);
       }, 0) || 0;
       const totalCollectedFees = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
       const totalBalance = totalExpectedFees - totalCollectedFees;
@@ -107,7 +126,7 @@ const Dashboard = () => {
         <div className="flex items-center gap-3">
           <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
           <div>
-            <h1 className="text-2xl font-bold">Dashboard</h1>
+            <h1 className="text-2xl font-bold">{schoolName}</h1>
             <p className="text-muted-foreground">Loading...</p>
           </div>
         </div>
@@ -121,7 +140,7 @@ const Dashboard = () => {
       <div className="flex items-center gap-3">
         <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl font-bold">{schoolName}</h1>
           <p className="text-muted-foreground">Welcome back! Here's your school's financial overview.</p>
         </div>
       </div>

@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,7 +15,6 @@ interface FeeStructure {
   id: string;
   name: string;
   monthly_fee: number;
-  annual_fee: number;
 }
 
 const FeeStructure = () => {
@@ -31,7 +29,6 @@ const FeeStructure = () => {
   const [formData, setFormData] = useState({
     name: "",
     monthly_fee: "",
-    annual_fee: "",
   });
 
   useEffect(() => {
@@ -44,7 +41,7 @@ const FeeStructure = () => {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('id, name, monthly_fee, annual_fee')
+        .select('id, name, monthly_fee')
         .order('name');
 
       if (error) throw error;
@@ -57,7 +54,7 @@ const FeeStructure = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", monthly_fee: "", annual_fee: "" });
+    setFormData({ name: "", monthly_fee: "" });
     setEditingStructure(null);
   };
 
@@ -67,7 +64,6 @@ const FeeStructure = () => {
       setFormData({
         name: structure.name,
         monthly_fee: structure.monthly_fee.toString(),
-        annual_fee: structure.annual_fee.toString(),
       });
     } else {
       resetForm();
@@ -93,7 +89,6 @@ const FeeStructure = () => {
           .update({
             name: formData.name,
             monthly_fee: Number(formData.monthly_fee),
-            annual_fee: Number(formData.annual_fee) || 0,
           })
           .eq('id', editingStructure.id);
 
@@ -105,7 +100,6 @@ const FeeStructure = () => {
           .insert({
             name: formData.name,
             monthly_fee: Number(formData.monthly_fee),
-            annual_fee: Number(formData.annual_fee) || 0,
             user_id: user?.id,
           });
 
@@ -147,7 +141,6 @@ const FeeStructure = () => {
   };
 
   const totalMonthlyFees = feeStructures.reduce((sum, f) => sum + f.monthly_fee, 0);
-  const totalAnnualFees = feeStructures.reduce((sum, f) => sum + f.annual_fee, 0);
 
   if (loading) {
     return (
@@ -237,15 +230,6 @@ const FeeStructure = () => {
                       placeholder="5000"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Annual Fee (KES)</Label>
-                    <Input
-                      type="number"
-                      value={formData.annual_fee}
-                      onChange={(e) => setFormData({ ...formData, annual_fee: e.target.value })}
-                      placeholder="50000"
-                    />
-                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -269,7 +253,6 @@ const FeeStructure = () => {
                 <TableRow>
                   <TableHead>Class</TableHead>
                   <TableHead>Monthly Fee</TableHead>
-                  <TableHead>Annual Fee</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -278,7 +261,6 @@ const FeeStructure = () => {
                   <TableRow key={structure.id}>
                     <TableCell className="font-medium">{structure.name}</TableCell>
                     <TableCell className="text-primary font-semibold">{formatCurrency(structure.monthly_fee)}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatCurrency(structure.annual_fee)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(structure)}>

@@ -14,12 +14,12 @@ import { formatCurrency } from "@/lib/formatters";
 
 interface Student {
   id: string;
+  admission_number: string | null;
   name: string;
   class_id: string | null;
   class_name: string;
   parent_name: string | null;
   phone: string | null;
-  email: string | null;
   status: string;
   total_fee: number;
 }
@@ -28,7 +28,6 @@ interface ClassOption {
   id: string;
   name: string;
   monthly_fee: number;
-  annual_fee: number;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -45,11 +44,11 @@ const Students = () => {
   const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
+    admission_number: "",
     name: "",
     class_id: "",
     parent_name: "",
     phone: "",
-    email: "",
   });
 
   useEffect(() => {
@@ -63,7 +62,7 @@ const Students = () => {
     try {
       const { data, error } = await supabase
         .from('students')
-        .select('*, classes(name, monthly_fee, annual_fee)')
+        .select('*, classes(name, monthly_fee)')
         .order('name');
 
       if (error) throw error;
@@ -72,14 +71,14 @@ const Students = () => {
         const classData = s.classes as any;
         return {
           id: s.id,
+          admission_number: s.admission_number,
           name: s.name,
           class_id: s.class_id,
           class_name: classData?.name || 'Unassigned',
           parent_name: s.parent_name,
           phone: s.phone,
-          email: s.email,
           status: s.status || 'active',
-          total_fee: (classData?.monthly_fee || 0) + (classData?.annual_fee || 0),
+          total_fee: classData?.monthly_fee || 0,
         };
       }) || [];
 
@@ -95,7 +94,7 @@ const Students = () => {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('id, name, monthly_fee, annual_fee')
+        .select('id, name, monthly_fee')
         .order('name');
 
       if (error) throw error;
@@ -108,7 +107,8 @@ const Students = () => {
   const filteredStudents = students.filter(
     (student) =>
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.class_name.toLowerCase().includes(searchTerm.toLowerCase())
+      student.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (student.admission_number && student.admission_number.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE);
@@ -118,7 +118,7 @@ const Students = () => {
   );
 
   const resetForm = () => {
-    setFormData({ name: "", class_id: "", parent_name: "", phone: "", email: "" });
+    setFormData({ admission_number: "", name: "", class_id: "", parent_name: "", phone: "" });
     setEditingStudent(null);
   };
 
@@ -126,11 +126,11 @@ const Students = () => {
     if (student) {
       setEditingStudent(student);
       setFormData({
+        admission_number: student.admission_number || "",
         name: student.name,
         class_id: student.class_id || "",
         parent_name: student.parent_name || "",
         phone: student.phone || "",
-        email: student.email || "",
       });
     } else {
       resetForm();
@@ -153,29 +153,49 @@ const Students = () => {
         const { error } = await supabase
           .from('students')
           .update({
+            admission_number: formData.admission_number || null,
             name: formData.name,
             class_id: formData.class_id || null,
             parent_name: formData.parent_name || null,
             phone: formData.phone || null,
-            email: formData.email || null,
           })
           .eq('id', editingStudent.id);
 
-        if (error) throw error;
+        if (error) {
+          if (error.message.includes('duplicate') || error.message.includes('unique')) {
+            toast({
+              title: "Error",
+              description: "This admission number is already used by another student",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw error;
+        }
         toast({ title: "Success", description: "Student updated successfully" });
       } else {
         const { error } = await supabase
           .from('students')
           .insert({
+            admission_number: formData.admission_number || null,
             name: formData.name,
             class_id: formData.class_id || null,
             parent_name: formData.parent_name || null,
             phone: formData.phone || null,
-            email: formData.email || null,
             user_id: user?.id,
           });
 
-        if (error) throw error;
+        if (error) {
+          if (error.message.includes('duplicate') || error.message.includes('unique')) {
+            toast({
+              title: "Error",
+              description: "This admission number is already used by another student",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw error;
+        }
         toast({ title: "Success", description: "Student added successfully" });
       }
 
@@ -228,7 +248,7 @@ const Students = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search students..."
+                  placeholder="Search by name or admission no..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 w-full sm:w-64"
@@ -248,6 +268,14 @@ const Students = () => {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Admission Number</Label>
+                      <Input
+                        value={formData.admission_number}
+                        onChange={(e) => setFormData({ ...formData, admission_number: e.target.value })}
+                        placeholder="e.g., 001"
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label>Full Name *</Label>
                       <Input
@@ -285,15 +313,6 @@ const Students = () => {
                         placeholder="+254 700 000 000"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="parent@email.com"
-                      />
-                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -309,6 +328,7 @@ const Students = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Adm. No.</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Class</TableHead>
                   <TableHead>Parent</TableHead>
@@ -320,19 +340,20 @@ const Students = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : paginatedStudents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No students found. Add your first student to get started.
                     </TableCell>
                   </TableRow>
                 ) : (
                   paginatedStudents.map((student) => (
                     <TableRow key={student.id}>
+                      <TableCell className="font-mono text-sm">{student.admission_number || "-"}</TableCell>
                       <TableCell className="font-medium">{student.name}</TableCell>
                       <TableCell>{student.class_name}</TableCell>
                       <TableCell>{student.parent_name || "-"}</TableCell>
