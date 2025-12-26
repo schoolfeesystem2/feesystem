@@ -45,17 +45,17 @@ const MainLayout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Mobile menu button */}
+    <div className="min-h-screen bg-background flex overflow-x-hidden">
+      {/* Mobile menu button - moved to right side */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-sidebar rounded-md text-sidebar-foreground"
+        className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-sidebar rounded-md text-sidebar-foreground"
       >
         {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
-      {/* Theme toggle for mobile */}
-      <div className="lg:hidden fixed top-4 right-4 z-50">
+      {/* Theme toggle for mobile - moved to left side */}
+      <div className="lg:hidden fixed top-4 left-4 z-50">
         <ThemeToggle />
       </div>
 
@@ -67,10 +67,10 @@ const MainLayout = () => {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - moved to right side on mobile */}
       <aside className={cn(
-        "fixed lg:static inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ease-in-out lg:transform-none",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        "fixed lg:static inset-y-0 right-0 lg:left-0 lg:right-auto z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ease-in-out lg:transform-none",
+        sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -85,7 +85,7 @@ const MainLayout = () => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -126,8 +126,8 @@ const MainLayout = () => {
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 lg:ml-0 p-6 lg:p-8 mt-14 lg:mt-0">
+      {/* Main content - scrollable */}
+      <main className="flex-1 lg:ml-0 p-4 sm:p-6 lg:p-8 mt-14 lg:mt-0 overflow-y-auto min-h-screen">
         <Outlet />
       </main>
     </div>
