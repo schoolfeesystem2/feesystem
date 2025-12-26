@@ -337,14 +337,14 @@ const Payments = () => {
                     <Plus className="h-4 w-4 mr-2" /> Record Payment
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingPayment ? "Edit Payment" : "Record New Payment"}</DialogTitle>
                     <DialogDescription>
                       {editingPayment ? "Update the payment details" : "Enter the payment details below"}
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4 py-4">
+                  <div className="space-y-3 py-2">
                     <div className="space-y-2">
                       <Label>Select Class *</Label>
                       <Select value={selectedClassId} onValueChange={handleClassChange}>

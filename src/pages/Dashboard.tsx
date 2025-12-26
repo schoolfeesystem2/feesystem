@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Users, DollarSign, TrendingUp, AlertCircle, Calendar } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,6 +38,10 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState("Dashboard");
   const [monthlyAnalysisData, setMonthlyAnalysisData] = useState<{ month: string; collected: number; expected: number }[]>([]);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{
+    status: string;
+    expiryDate: Date | null;
+  }>({ status: 'trial', expiryDate: null });
 
   useEffect(() => {
     if (user) {
@@ -49,13 +54,29 @@ const Dashboard = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('school_name')
+        .select('school_name, subscription_status, trial_end_date, subscription_end_date')
         .eq('id', user?.id)
         .single();
 
       if (error) throw error;
       if (data?.school_name) {
         setSchoolName(data.school_name);
+      }
+      
+      // Set subscription status
+      if (data) {
+        const trialEnd = data.trial_end_date ? new Date(data.trial_end_date) : null;
+        const subEnd = data.subscription_end_date ? new Date(data.subscription_end_date) : null;
+        const now = new Date();
+        
+        let status = data.subscription_status || 'trial';
+        let expiryDate = status === 'active' ? subEnd : trialEnd;
+        
+        if (status === 'trial' && trialEnd && trialEnd < now) {
+          status = 'expired';
+        }
+        
+        setSubscriptionStatus({ status, expiryDate });
       }
     } catch (error) {
       console.error('Error fetching school name:', error);
@@ -136,13 +157,41 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
-        <div>
-          <h1 className="text-2xl font-bold">{schoolName}</h1>
-          <p className="text-muted-foreground">Welcome back! Here's your school's financial overview.</p>
+      {/* Header with Subscription Status */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
+          <div>
+            <h1 className="text-2xl font-bold">{schoolName}</h1>
+            <p className="text-muted-foreground">Welcome back! Here's your school's financial overview.</p>
+          </div>
         </div>
+        
+        {/* Subscription Status Badge */}
+        <Card className="sm:w-auto">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="text-right">
+              <div className="flex items-center gap-2 justify-end">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                {subscriptionStatus.status === 'active' ? (
+                  <Badge className="bg-success hover:bg-success">ACTIVE</Badge>
+                ) : subscriptionStatus.status === 'trial' ? (
+                  <Badge className="bg-primary hover:bg-primary">FREE TRIAL</Badge>
+                ) : (
+                  <Badge variant="destructive">EXPIRED</Badge>
+                )}
+              </div>
+              {subscriptionStatus.expiryDate && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 justify-end">
+                  <Calendar className="h-3 w-3" />
+                  <span>
+                    {subscriptionStatus.status === 'active' ? 'Renews' : 'Expires'}: {subscriptionStatus.expiryDate.toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Stats Cards */}
