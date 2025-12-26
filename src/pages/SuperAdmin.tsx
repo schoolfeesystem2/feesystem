@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +39,7 @@ interface School {
   subscription_end_date: string | null;
   trial_end_date: string | null;
   last_active: string | null;
+  max_students: number | null;
 }
 
 const SuperAdmin = () => {
@@ -54,6 +56,9 @@ const SuperAdmin = () => {
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [managePlan, setManagePlan] = useState("Small");
+  const [manageStatus, setManageStatus] = useState("trial");
+  const [manageMaxStudents, setManageMaxStudents] = useState(200);
 
   useEffect(() => {
     checkSuperAdminStatus();
@@ -93,7 +98,7 @@ const SuperAdmin = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, school_name, email, school_phone, subscription_status, subscription_plan, subscription_end_date, trial_end_date, last_active')
+        .select('id, school_name, email, school_phone, subscription_status, subscription_plan, subscription_end_date, trial_end_date, last_active, max_students')
         .order('school_name');
 
       if (error) throw error;
@@ -127,7 +132,42 @@ const SuperAdmin = () => {
 
   const handleManageSchool = (school: School) => {
     setSelectedSchool(school);
+    setManagePlan(school.subscription_plan || "Small");
+    setManageStatus(school.subscription_status || "trial");
+    setManageMaxStudents(school.max_students || 200);
     setManageDialogOpen(true);
+  };
+
+  const handleSaveChanges = async () => {
+    if (!selectedSchool) return;
+    setUpdatingStatus(true);
+
+    try {
+      const updateData: any = { 
+        subscription_status: manageStatus,
+        subscription_plan: managePlan,
+        max_students: manageMaxStudents
+      };
+      
+      if (manageStatus === 'active') {
+        updateData.subscription_end_date = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', selectedSchool.id);
+
+      if (error) throw error;
+
+      toast({ title: "Success", description: "School settings updated successfully" });
+      setManageDialogOpen(false);
+      fetchSchools();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
@@ -316,6 +356,7 @@ const SuperAdmin = () => {
                         <TableHead>Email</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Plan</TableHead>
+                        <TableHead>Max Students</TableHead>
                         <TableHead>Next Payment</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -326,7 +367,8 @@ const SuperAdmin = () => {
                           <TableCell className="font-medium">{school.school_name || 'Unnamed School'}</TableCell>
                           <TableCell>{school.email}</TableCell>
                           <TableCell>{getStatusBadge(school.subscription_status)}</TableCell>
-                          <TableCell>{school.subscription_plan || 'Free'}</TableCell>
+                          <TableCell>{school.subscription_plan || 'Small'}</TableCell>
+                          <TableCell>{school.max_students || 200}</TableCell>
                           <TableCell>
                             {school.subscription_end_date 
                               ? format(new Date(school.subscription_end_date), 'MMM dd, yyyy')
@@ -448,45 +490,55 @@ const SuperAdmin = () => {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Manage School</DialogTitle>
-              <DialogDescription>{selectedSchool?.school_name}</DialogDescription>
+              <DialogDescription>Update subscription and plan settings for {selectedSchool?.school_name}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Email</p>
-                  <p className="font-medium">{selectedSchool?.email}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Phone</p>
-                  <p className="font-medium">{selectedSchool?.school_phone || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Current Status</p>
-                  <div className="mt-1">{getStatusBadge(selectedSchool?.subscription_status || null)}</div>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Plan</p>
-                  <p className="font-medium">{selectedSchool?.subscription_plan || 'Free'}</p>
-                </div>
+              <div className="space-y-2">
+                <Label>Plan Type</Label>
+                <Select value={managePlan} onValueChange={setManagePlan}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="Small">Small (up to 200 students)</SelectItem>
+                    <SelectItem value="Medium">Medium (up to 500 students)</SelectItem>
+                    <SelectItem value="Large">Large (up to 1000 students)</SelectItem>
+                    <SelectItem value="Enterprise">Enterprise (unlimited)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex gap-2">
-                <Button 
-                  className="flex-1 bg-green-600 hover:bg-green-700" 
-                  onClick={() => handleUpdateStatus('active')}
-                  disabled={updatingStatus}
-                >
-                  Activate
-                </Button>
-                <Button 
-                  className="flex-1" 
-                  variant="destructive" 
-                  onClick={() => handleUpdateStatus('expired')}
-                  disabled={updatingStatus}
-                >
-                  Deactivate
-                </Button>
+              
+              <div className="space-y-2">
+                <Label>Subscription Status</Label>
+                <Select value={manageStatus} onValueChange={setManageStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="trial">Trial</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Max Students</Label>
+                <Input 
+                  type="number" 
+                  value={manageMaxStudents} 
+                  onChange={(e) => setManageMaxStudents(Number(e.target.value))}
+                  placeholder="200"
+                />
               </div>
             </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setManageDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveChanges} disabled={updatingStatus}>
+                {updatingStatus ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Save Changes
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </main>
