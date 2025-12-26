@@ -26,7 +26,7 @@ interface SubscriptionInfo {
 
 const Billing = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isExpired } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionInfo>({
     status: "trial",
     plan: null,
@@ -149,7 +149,7 @@ const Billing = () => {
     return 'N/A';
   };
 
-  const isTrialExpired = subscription.status === 'expired';
+  const isTrialExpired = subscription.status === 'expired' || isExpired;
 
   if (loading) {
     return (
