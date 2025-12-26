@@ -20,7 +20,7 @@ import {
   Loader2,
   CreditCard
 } from "lucide-react";
-import appIcon from "@/assets/app-icon.png";
+import appLogo from "@/assets/app-logo.png";
 import { cn } from "@/lib/utils";
 
 const MainLayout = () => {
@@ -57,9 +57,11 @@ const MainLayout = () => {
     <div className="min-h-screen bg-background flex overflow-x-hidden">
       <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
       {/* Mobile header with menu and theme toggle */}
-      <div className="lg:hidden fixed top-4 right-4 z-50 flex items-center gap-2">
-        <BroadcastNotification />
-        <ThemeToggle />
+      <div className="lg:hidden fixed top-4 right-4 z-50 flex items-center gap-3">
+        <div className="flex items-center gap-2 bg-sidebar rounded-md p-1">
+          <BroadcastNotification />
+          <ThemeToggle />
+        </div>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="p-2 bg-sidebar rounded-md text-sidebar-foreground"
@@ -85,7 +87,7 @@ const MainLayout = () => {
           {/* Logo */}
           <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
             <Link to="/dashboard" className="flex items-center gap-3">
-              <img src={appIcon} alt="School Fee System" className="h-10 w-10" />
+              <img src={appLogo} alt="School Fee System" className="h-10 w-10" />
               <span className="font-bold text-lg">School Fee</span>
             </Link>
             <div className="hidden lg:flex items-center gap-2">

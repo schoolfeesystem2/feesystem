@@ -56,20 +56,6 @@ const MonthlyAnalysis = ({ data }: MonthlyAnalysisProps) => {
       <CardContent>
         {data.length > 0 ? (
           <>
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-success/10 rounded-lg p-4">
-                <p className="text-sm text-muted-foreground">Total Collected</p>
-                <p className="text-xl font-bold text-success">{formatCurrency(totalCollected)}</p>
-              </div>
-              <div className="bg-primary/10 rounded-lg p-4">
-                <p className="text-sm text-muted-foreground">Total Expected</p>
-                <p className="text-xl font-bold text-primary">{formatCurrency(totalExpected)}</p>
-              </div>
-              <div className="bg-accent/10 rounded-lg p-4">
-                <p className="text-sm text-muted-foreground">Overall Rate</p>
-                <p className="text-xl font-bold text-accent">{overallRate}%</p>
-              </div>
-            </div>
 
             <div className="overflow-x-auto">
               <Table>

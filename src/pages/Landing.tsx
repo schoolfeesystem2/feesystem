@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, DollarSign, BarChart3, Shield, ArrowRight, CheckCircle } from "lucide-react";
-import appIcon from "@/assets/app-icon.png";
+import appLogo from "@/assets/app-logo.png";
 const Landing = () => {
   const features = [{
     icon: Users,
@@ -27,7 +27,7 @@ const Landing = () => {
       <header className="container mx-auto px-4 py-6">
         <nav className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img alt="School Fee System" className="h-12 w-12 object-contain" src="/lovable-uploads/93b7a86f-59f4-47d7-8b9d-1f0a3fb8cbf5.png" />
+            <img alt="School Fee System" className="h-12 w-12 object-contain" src={appLogo} />
             <span className="text-xl font-bold text-foreground">SchoolFee System</span>
           </div>
           <div className="flex items-center gap-4">
@@ -93,7 +93,7 @@ const Landing = () => {
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex items-center gap-4 mb-6">
-                  <img alt="App Icon" className="h-12 w-12" src="/lovable-uploads/7618be0d-c73e-4e4a-b09c-fe722932788f.png" />
+                  <img alt="App Icon" className="h-12 w-12" src={appLogo} />
                   <div>
                     <h3 className="font-semibold text-foreground">Dashboard Overview</h3>
                     <p className="text-sm text-muted-foreground">Real-time financial data</p>
@@ -174,7 +174,7 @@ const Landing = () => {
               </div>
             </div>
             <div className="flex justify-center">
-              <img alt="School Fee System" className="h-48 w-48 object-contain opacity-80" src="/lovable-uploads/f5537cea-b1f7-4eb1-848d-7cfaf481ed75.png" />
+              <img alt="School Fee System" className="h-48 w-48 object-contain opacity-80" src={appLogo} />
             </div>
           </div>
         </div>
@@ -200,7 +200,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img src={appIcon} alt="School Fee System" className="h-8 w-8 object-contain" />
+              <img src={appLogo} alt="School Fee System" className="h-8 w-8 object-contain" />
               <span className="font-semibold text-foreground">School Fee System</span>
             </div>
             <p className="text-sm text-muted-foreground">

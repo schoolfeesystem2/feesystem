@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import appIcon from "@/assets/app-icon.png";
+import appLogo from "@/assets/app-logo.png";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -196,7 +196,7 @@ const Auth = () => {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="flex justify-center mb-2">
-            <img src={appIcon} alt="School Fee System" className="h-16 w-16 object-contain" />
+            <img src={appLogo} alt="School Fee System" className="h-16 w-16 object-contain" />
           </div>
           <CardTitle className="text-2xl">School Fee System</CardTitle>
           <CardDescription>Admin Portal - Manage your school's finances</CardDescription>

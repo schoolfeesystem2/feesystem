@@ -7,6 +7,7 @@ import { AuthProvider, ProtectedRoute } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Students from "./pages/Students";
@@ -32,6 +33,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/reset-password" element={<ResetPassword />} />
               <Route element={
                 <ProtectedRoute>
                   <MainLayout />

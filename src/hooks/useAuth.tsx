@@ -1,16 +1,26 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+interface SubscriptionInfo {
+  status: string | null;
+  plan: string | null;
+  trialEndDate: string | null;
+  subscriptionEndDate: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  subscription: SubscriptionInfo | null;
+  isExpired: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, metadata?: { school_name?: string; school_address?: string; school_phone?: string }) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  refreshSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,14 +29,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [isExpired, setIsExpired] = useState(false);
+
+  const checkSubscriptionExpiry = (sub: SubscriptionInfo | null) => {
+    if (!sub) return false;
+    
+    const now = new Date();
+    
+    // Check if trial has expired
+    if (sub.status === 'trial' && sub.trialEndDate) {
+      const trialEnd = new Date(sub.trialEndDate);
+      if (now > trialEnd) return true;
+    }
+    
+    // Check if subscription has expired
+    if (sub.status === 'expired') return true;
+    
+    if (sub.status === 'active' && sub.subscriptionEndDate) {
+      const subEnd = new Date(sub.subscriptionEndDate);
+      if (now > subEnd) return true;
+    }
+    
+    return false;
+  };
+
+  const fetchSubscription = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('subscription_status, subscription_plan, trial_end_date, subscription_end_date')
+      .eq('id', userId)
+      .single();
+    
+    if (data) {
+      const subInfo: SubscriptionInfo = {
+        status: data.subscription_status,
+        plan: data.subscription_plan,
+        trialEndDate: data.trial_end_date,
+        subscriptionEndDate: data.subscription_end_date,
+      };
+      setSubscription(subInfo);
+      setIsExpired(checkSubscriptionExpiry(subInfo));
+    }
+  };
+
+  const refreshSubscription = async () => {
+    if (user) {
+      await fetchSubscription(user.id);
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Defer subscription fetch
+        if (session?.user) {
+          setTimeout(() => {
+            fetchSubscription(session.user.id);
+          }, 0);
+        } else {
+          setSubscription(null);
+          setIsExpired(false);
+        }
       }
     );
 
@@ -35,9 +104,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      if (session?.user) {
+        fetchSubscription(session.user.id);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => authSub.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -64,13 +137,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth`,
+      redirectTo: `${window.location.origin}/auth/reset-password`,
     });
     return { error };
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, session, loading, subscription, isExpired, signIn, signUp, signOut, resetPassword, refreshSubscription }}>
       {children}
     </AuthContext.Provider>
   );
@@ -86,14 +159,25 @@ export const useAuth = () => {
 
 // Protected Route Component
 export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, isExpired } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
     }
   }, [user, loading, navigate]);
+
+  // Redirect expired users to billing (unless already on billing or contact)
+  useEffect(() => {
+    if (!loading && user && isExpired) {
+      const allowedPaths = ['/billing', '/contact', '/settings'];
+      if (!allowedPaths.includes(location.pathname)) {
+        navigate('/billing');
+      }
+    }
+  }, [user, loading, isExpired, location.pathname, navigate]);
 
   if (loading) {
     return (
