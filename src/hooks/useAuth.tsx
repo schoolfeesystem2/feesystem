@@ -16,6 +16,7 @@ interface AuthContextType {
   loading: boolean;
   subscription: SubscriptionInfo | null;
   isExpired: boolean;
+  isSuperAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, metadata?: { school_name?: string; school_address?: string; school_phone?: string }) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -31,6 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const checkSubscriptionExpiry = (sub: SubscriptionInfo | null) => {
     if (!sub) return false;
@@ -54,7 +56,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
+  const checkSuperAdminRole = async (userId: string) => {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'super_admin')
+      .maybeSingle();
+    
+    setIsSuperAdmin(!!data);
+    return !!data;
+  };
+
   const fetchSubscription = async (userId: string) => {
+    // First check if user is super admin
+    const isAdmin = await checkSuperAdminRole(userId);
+    
     const { data } = await supabase
       .from('profiles')
       .select('subscription_status, subscription_plan, trial_end_date, subscription_end_date')
@@ -69,7 +86,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         subscriptionEndDate: data.subscription_end_date,
       };
       setSubscription(subInfo);
-      setIsExpired(checkSubscriptionExpiry(subInfo));
+      // Super admins are never considered expired
+      setIsExpired(isAdmin ? false : checkSubscriptionExpiry(subInfo));
     }
   };
 
@@ -143,7 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, subscription, isExpired, signIn, signUp, signOut, resetPassword, refreshSubscription }}>
+    <AuthContext.Provider value={{ user, session, loading, subscription, isExpired, isSuperAdmin, signIn, signUp, signOut, resetPassword, refreshSubscription }}>
       {children}
     </AuthContext.Provider>
   );
@@ -169,10 +187,10 @@ export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, navigate]);
 
-  // Redirect expired users to billing (unless already on billing or contact)
+  // Redirect expired users to billing (unless already on billing, contact, settings, or superadmin)
   useEffect(() => {
     if (!loading && user && isExpired) {
-      const allowedPaths = ['/billing', '/contact', '/settings'];
+      const allowedPaths = ['/billing', '/contact', '/settings', '/superadmin'];
       if (!allowedPaths.includes(location.pathname)) {
         navigate('/billing');
       }

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageCircle, Mail, BookOpen, CheckCircle2 } from "lucide-react";
-import appIcon from "@/assets/app-icon.png";
+import appLogo from "@/assets/app-logo.png";
 
 const CONTACT_EMAIL = "schoolfeesystem@gmail.com";
 const CONTACT_WHATSAPP = "+254726383188";
@@ -17,7 +17,7 @@ const Contact = () => {
   return (
     <div className="space-y-6 pb-6">
       <div className="flex items-center gap-3">
-        <img src={appIcon} alt="School Fee System" className="h-10 w-10 sm:h-12 sm:w-12 object-contain" />
+        <img src={appLogo} alt="School Fee System" className="h-10 w-10 sm:h-12 sm:w-12 object-contain" />
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Contact Us</h1>
           <p className="text-sm text-muted-foreground">Get in touch with our support team</p>
