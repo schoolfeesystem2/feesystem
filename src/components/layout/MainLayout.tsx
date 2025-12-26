@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import ThemeToggle from "@/components/ThemeToggle";
 import BroadcastNotification from "@/components/BroadcastNotification";
+import PullToRefreshIndicator from "@/components/PullToRefresh";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { 
   LayoutDashboard, 
   Users, 
@@ -28,6 +30,12 @@ const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  const handleRefresh = useCallback(async () => {
+    window.location.reload();
+  }, []);
+
+  const { isRefreshing, pullDistance } = usePullToRefresh({ onRefresh: handleRefresh });
+
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: Users, label: "Students", path: "/students" },
@@ -47,6 +55,7 @@ const MainLayout = () => {
 
   return (
     <div className="min-h-screen bg-background flex overflow-x-hidden">
+      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
       {/* Mobile header with menu and theme toggle */}
       <div className="lg:hidden fixed top-4 right-4 z-50 flex items-center gap-2">
         <BroadcastNotification />
