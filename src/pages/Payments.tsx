@@ -30,6 +30,12 @@ interface Student {
   id: string;
   name: string;
   admission_number: string | null;
+  class_id: string | null;
+}
+
+interface Class {
+  id: string;
+  name: string;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -43,7 +49,9 @@ const Payments = () => {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedClassId, setSelectedClassId] = useState("");
 
   const paymentMethods = ["Cash", "M-Pesa", "Bank Transfer", "Cheque"];
 
@@ -58,8 +66,23 @@ const Payments = () => {
     if (user) {
       fetchPayments();
       fetchStudents();
+      fetchClasses();
     }
   }, [user]);
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
+  };
 
   const fetchPayments = async () => {
     try {
@@ -94,7 +117,7 @@ const Payments = () => {
     try {
       const { data, error } = await supabase
         .from('students')
-        .select('id, name, admission_number')
+        .select('id, name, admission_number, class_id')
         .eq('status', 'active');
 
       if (error) throw error;
@@ -103,6 +126,11 @@ const Payments = () => {
       console.error('Error fetching students:', error);
     }
   };
+
+  // Filter students by selected class
+  const filteredStudentsByClass = selectedClassId 
+    ? students.filter(s => s.class_id === selectedClassId)
+    : [];
 
   const filteredPayments = payments.filter(
     (payment) =>
@@ -121,12 +149,18 @@ const Payments = () => {
 
   const resetForm = () => {
     setFormData({ student_id: "", amount: "", payment_method: "", notes: "" });
+    setSelectedClassId("");
     setEditingPayment(null);
   };
 
   const handleOpenDialog = (payment?: Payment) => {
     if (payment) {
       setEditingPayment(payment);
+      // Find the student to get their class_id
+      const student = students.find(s => s.id === payment.student_id);
+      if (student?.class_id) {
+        setSelectedClassId(student.class_id);
+      }
       setFormData({
         student_id: payment.student_id,
         amount: payment.amount.toString(),
@@ -139,8 +173,13 @@ const Payments = () => {
     setIsDialogOpen(true);
   };
 
+  const handleClassChange = (classId: string) => {
+    setSelectedClassId(classId);
+    setFormData({ ...formData, student_id: "" }); // Reset student selection when class changes
+  };
+
   const handleSave = async () => {
-    if (!formData.student_id || !formData.amount || !formData.payment_method) {
+    if (!selectedClassId || !formData.student_id || !formData.amount || !formData.payment_method) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -299,13 +338,33 @@ const Payments = () => {
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label>Select Student *</Label>
-                      <Select value={formData.student_id} onValueChange={(val) => setFormData({ ...formData, student_id: val })}>
+                      <Label>Select Class *</Label>
+                      <Select value={selectedClassId} onValueChange={handleClassChange}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Search and select student" />
+                          <SelectValue placeholder="Select class first" />
                         </SelectTrigger>
                         <SelectContent>
-                          {students.map((student) => (
+                          {classes.map((cls) => (
+                            <SelectItem key={cls.id} value={cls.id}>
+                              {cls.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Select Student *</Label>
+                      <Select 
+                        value={formData.student_id} 
+                        onValueChange={(val) => setFormData({ ...formData, student_id: val })}
+                        disabled={!selectedClassId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={selectedClassId ? "Select student" : "Select class first"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredStudentsByClass.map((student) => (
                             <SelectItem key={student.id} value={student.id}>
                               {student.admission_number ? `${student.admission_number} - ` : ''}{student.name}
                             </SelectItem>
