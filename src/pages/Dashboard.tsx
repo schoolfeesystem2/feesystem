@@ -10,97 +10,97 @@ import appIcon from "@/assets/app-icon.png";
 import MonthlyTargetCard from "@/components/dashboard/MonthlyTargetCard";
 import CollectionChart from "@/components/dashboard/CollectionChart";
 import MonthlyAnalysis from "@/components/dashboard/MonthlyAnalysis";
-
 interface DashboardStats {
   totalStudents: number;
   totalExpectedFees: number;
   totalCollectedFees: number;
   totalBalance: number;
 }
-
 interface RecentPayment {
   id: string;
   student_name: string;
   amount: number;
   payment_date: string;
 }
-
 const Dashboard = () => {
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
     totalExpectedFees: 0,
     totalCollectedFees: 0,
-    totalBalance: 0,
+    totalBalance: 0
   });
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
   const [monthlyTarget, setMonthlyTarget] = useState(0);
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState("Dashboard");
-  const [monthlyAnalysisData, setMonthlyAnalysisData] = useState<{ month: string; collected: number; expected: number }[]>([]);
+  const [monthlyAnalysisData, setMonthlyAnalysisData] = useState<{
+    month: string;
+    collected: number;
+    expected: number;
+  }[]>([]);
   const [subscriptionStatus, setSubscriptionStatus] = useState<{
     status: string;
     expiryDate: Date | null;
-  }>({ status: 'trial', expiryDate: null });
-
+  }>({
+    status: 'trial',
+    expiryDate: null
+  });
   useEffect(() => {
     if (user) {
       fetchDashboardData();
       fetchSchoolName();
     }
   }, [user]);
-
   const fetchSchoolName = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('school_name, subscription_status, trial_end_date, subscription_end_date')
-        .eq('id', user?.id)
-        .single();
-
+      const {
+        data,
+        error
+      } = await supabase.from('profiles').select('school_name, subscription_status, trial_end_date, subscription_end_date').eq('id', user?.id).single();
       if (error) throw error;
       if (data?.school_name) {
         setSchoolName(data.school_name);
       }
-      
+
       // Set subscription status
       if (data) {
         const trialEnd = data.trial_end_date ? new Date(data.trial_end_date) : null;
         const subEnd = data.subscription_end_date ? new Date(data.subscription_end_date) : null;
         const now = new Date();
-        
         let status = data.subscription_status || 'trial';
         let expiryDate = status === 'active' ? subEnd : trialEnd;
-        
         if (status === 'trial' && trialEnd && trialEnd < now) {
           status = 'expired';
         }
-        
-        setSubscriptionStatus({ status, expiryDate });
+        setSubscriptionStatus({
+          status,
+          expiryDate
+        });
       }
     } catch (error) {
       console.error('Error fetching school name:', error);
     }
   };
-
   const fetchDashboardData = async () => {
     try {
       // Fetch students count and classes for expected fees
-      const { data: students, error: studentsError } = await supabase
-        .from('students')
-        .select('id, class_id, classes(monthly_fee)')
-        .eq('status', 'active');
-
+      const {
+        data: students,
+        error: studentsError
+      } = await supabase.from('students').select('id, class_id, classes(monthly_fee)').eq('status', 'active');
       if (studentsError) throw studentsError;
 
       // Fetch payments
-      const { data: payments, error: paymentsError } = await supabase
-        .from('payments')
-        .select('id, amount, payment_date, student_id, students(name)')
-        .order('payment_date', { ascending: false });
-
+      const {
+        data: payments,
+        error: paymentsError
+      } = await supabase.from('payments').select('id, amount, payment_date, student_id, students(name)').order('payment_date', {
+        ascending: false
+      });
       if (paymentsError) throw paymentsError;
-
       const totalStudents = students?.length || 0;
       const totalExpectedFees = students?.reduce((sum, s) => {
         const classData = s.classes as any;
@@ -108,12 +108,11 @@ const Dashboard = () => {
       }, 0) || 0;
       const totalCollectedFees = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
       const totalBalance = totalExpectedFees - totalCollectedFees;
-
       setStats({
         totalStudents,
         totalExpectedFees,
         totalCollectedFees,
-        totalBalance: Math.max(0, totalBalance),
+        totalBalance: Math.max(0, totalBalance)
       });
 
       // Set initial monthly target to expected fees
@@ -126,9 +125,8 @@ const Dashboard = () => {
         id: p.id,
         student_name: (p.students as any)?.name || 'Unknown',
         amount: p.amount,
-        payment_date: p.payment_date,
+        payment_date: p.payment_date
       })) || [];
-
       setRecentPayments(formattedPayments);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -136,14 +134,9 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
-
-  const collectionRate = stats.totalExpectedFees > 0 
-    ? Math.round((stats.totalCollectedFees / stats.totalExpectedFees) * 100) 
-    : 0;
-
+  const collectionRate = stats.totalExpectedFees > 0 ? Math.round(stats.totalCollectedFees / stats.totalExpectedFees * 100) : 0;
   if (loading) {
-    return (
-      <div className="space-y-6">
+    return <div className="space-y-6">
         <div className="flex items-center gap-3">
           <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
           <div>
@@ -151,16 +144,13 @@ const Dashboard = () => {
             <p className="text-muted-foreground">Loading...</p>
           </div>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       {/* Header with Subscription Status */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
+          <img alt="School Fee System" className="h-12 w-12 object-contain" src="/lovable-uploads/099ee22e-79ba-4783-85d1-cd9ba0125ad4.png" />
           <div>
             <h1 className="text-2xl font-bold">{schoolName}</h1>
             <p className="text-muted-foreground">Welcome back! Here's your school's financial overview.</p>
@@ -173,22 +163,14 @@ const Dashboard = () => {
             <div className="text-right">
               <div className="flex items-center gap-2 justify-end">
                 <span className="text-sm text-muted-foreground">Status:</span>
-                {subscriptionStatus.status === 'active' ? (
-                  <Badge className="bg-success hover:bg-success">ACTIVE</Badge>
-                ) : subscriptionStatus.status === 'trial' ? (
-                  <Badge className="bg-primary hover:bg-primary">FREE TRIAL</Badge>
-                ) : (
-                  <Badge variant="destructive">EXPIRED</Badge>
-                )}
+                {subscriptionStatus.status === 'active' ? <Badge className="bg-success hover:bg-success">ACTIVE</Badge> : subscriptionStatus.status === 'trial' ? <Badge className="bg-primary hover:bg-primary">FREE TRIAL</Badge> : <Badge variant="destructive">EXPIRED</Badge>}
               </div>
-              {subscriptionStatus.expiryDate && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 justify-end">
+              {subscriptionStatus.expiryDate && <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 justify-end">
                   <Calendar className="h-3 w-3" />
                   <span>
                     {subscriptionStatus.status === 'active' ? 'Renews' : 'Expires'}: {subscriptionStatus.expiryDate.toLocaleDateString()}
                   </span>
-                </div>
-              )}
+                </div>}
             </div>
           </CardContent>
         </Card>
@@ -242,12 +224,7 @@ const Dashboard = () => {
       </div>
 
       {/* Monthly Target Card */}
-      <MonthlyTargetCard
-        expectedFees={stats.totalExpectedFees}
-        collectedFees={stats.totalCollectedFees}
-        monthlyTarget={monthlyTarget}
-        onTargetChange={setMonthlyTarget}
-      />
+      <MonthlyTargetCard expectedFees={stats.totalExpectedFees} collectedFees={stats.totalCollectedFees} monthlyTarget={monthlyTarget} onTargetChange={setMonthlyTarget} />
 
       {/* Collection Chart */}
       <CollectionChart onMonthlyDataChange={setMonthlyAnalysisData} />
@@ -261,8 +238,7 @@ const Dashboard = () => {
           <CardTitle>Recent Payments</CardTitle>
         </CardHeader>
         <CardContent>
-          {recentPayments.length > 0 ? (
-            <Table>
+          {recentPayments.length > 0 ? <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Student</TableHead>
@@ -271,22 +247,15 @@ const Dashboard = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentPayments.map((payment) => (
-                  <TableRow key={payment.id}>
+                {recentPayments.map(payment => <TableRow key={payment.id}>
                     <TableCell className="font-medium">{payment.student_name}</TableCell>
                     <TableCell className="text-success">{formatCurrency(payment.amount)}</TableCell>
                     <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
-                  </TableRow>
-                ))}
+                  </TableRow>)}
               </TableBody>
-            </Table>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">No payments recorded yet</p>
-          )}
+            </Table> : <p className="text-center text-muted-foreground py-8">No payments recorded yet</p>}
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default Dashboard;
