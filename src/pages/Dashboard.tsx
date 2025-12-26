@@ -140,8 +140,8 @@ const Dashboard = () => {
         <div className="flex items-center gap-3">
           <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
           <div>
-            <h1 className="text-2xl font-bold">Loading...</h1>
-            <p className="text-muted-foreground">Fetching your school data...</p>
+            <h1 className="text-2xl font-bold">{schoolName}</h1>
+            <p className="text-muted-foreground">Loading...</p>
           </div>
         </div>
       </div>;
@@ -150,7 +150,7 @@ const Dashboard = () => {
       {/* Header with Subscription Status */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <img alt="School Fee System" className="h-12 w-12 object-contain" src={appIcon} />
+          <img alt="School Fee System" className="h-12 w-12 object-contain" src="/lovable-uploads/cef3a25c-3e59-43de-9e23-bbd4bd027de0.png" />
           <div>
             <h1 className="text-2xl font-bold">{schoolName}</h1>
             <p className="text-muted-foreground">Welcome back! Here's your school's financial overview.</p>
