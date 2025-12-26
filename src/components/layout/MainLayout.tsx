@@ -46,17 +46,15 @@ const MainLayout = () => {
 
   return (
     <div className="min-h-screen bg-background flex overflow-x-hidden">
-      {/* Mobile menu button - moved to right side */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-sidebar rounded-md text-sidebar-foreground"
-      >
-        {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </button>
-
-      {/* Theme toggle for mobile - moved to left side */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      {/* Mobile header with menu and theme toggle */}
+      <div className="lg:hidden fixed top-4 right-4 z-50 flex items-center gap-2">
         <ThemeToggle />
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 bg-sidebar rounded-md text-sidebar-foreground"
+        >
+          {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
       </div>
 
       {/* Overlay */}

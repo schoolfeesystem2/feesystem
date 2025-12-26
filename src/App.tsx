@@ -16,6 +16,7 @@ import Reports from "./pages/Reports";
 import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import Contact from "./pages/Contact";
+import SuperAdmin from "./pages/SuperAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,9 +44,14 @@ const App = () => (
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/billing" element={<Billing />} />
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/contact" element={<Contact />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
+              <Route path="/contact" element={<Contact />} />
+            </Route>
+            <Route path="/superadmin" element={
+              <ProtectedRoute>
+                <SuperAdmin />
+              </ProtectedRoute>
+            } />
+            <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
         </BrowserRouter>
