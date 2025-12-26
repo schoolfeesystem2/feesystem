@@ -53,7 +53,15 @@ const Payments = () => {
   const [loading, setLoading] = useState(true);
   const [selectedClassId, setSelectedClassId] = useState("");
 
-  const paymentMethods = ["Cash", "M-Pesa", "Bank Transfer", "Cheque"];
+  const paymentMethodOptions = [
+    { value: "cash", label: "Cash" },
+    { value: "mobile_money", label: "Mobile Money (M-Pesa)" },
+    { value: "bank_transfer", label: "Bank Transfer" },
+    { value: "card", label: "Card" },
+  ] as const;
+
+  const getPaymentMethodLabel = (value: string) =>
+    paymentMethodOptions.find((o) => o.value === value)?.label ?? value;
 
   const [formData, setFormData] = useState({
     student_id: "",
@@ -93,16 +101,16 @@ const Payments = () => {
 
       if (error) throw error;
 
-      const formattedPayments = data?.map(p => ({
+      const formattedPayments = data?.map((p) => ({
         id: p.id,
         student_id: p.student_id,
-        student_name: (p.students as any)?.name || 'Unknown',
+        student_name: (p.students as any)?.name || "Unknown",
         admission_number: (p.students as any)?.admission_number || null,
         amount: p.amount,
         payment_date: p.payment_date,
-        payment_method: p.payment_method || 'Cash',
-        payment_type: p.payment_type || 'Tuition',
-        notes: p.notes || '',
+        payment_method: p.payment_method || "cash",
+        payment_type: p.payment_type || "tuition",
+        notes: p.notes || "",
       })) || [];
 
       setPayments(formattedPayments);
@@ -233,13 +241,13 @@ const Payments = () => {
     const data = {
       title: "Payment History",
       headers: ["Adm. No.", "Student", "Amount", "Method", "Date", "Notes"],
-      rows: filteredPayments.map(p => [
+      rows: filteredPayments.map((p) => [
         p.admission_number || "-",
         p.student_name,
         formatCurrency(p.amount),
-        p.payment_method,
+        getPaymentMethodLabel(p.payment_method),
         formatDate(p.payment_date),
-        p.notes || "-"
+        p.notes || "-",
       ]),
     };
     exportToPDF(data, "payments-report");
@@ -250,13 +258,13 @@ const Payments = () => {
     const data = {
       title: "Payments",
       headers: ["Adm. No.", "Student", "Amount", "Method", "Date", "Notes"],
-      rows: filteredPayments.map(p => [
+      rows: filteredPayments.map((p) => [
         p.admission_number || "",
         p.student_name,
         p.amount,
-        p.payment_method,
+        getPaymentMethodLabel(p.payment_method),
         p.payment_date,
-        p.notes || ""
+        p.notes || "",
       ]),
     };
     exportToExcel(data, "payments-report");
@@ -406,8 +414,10 @@ const Payments = () => {
                           <SelectValue placeholder="Select payment method" />
                         </SelectTrigger>
                         <SelectContent>
-                          {paymentMethods.map((method) => (
-                            <SelectItem key={method} value={method}>{method}</SelectItem>
+                          {paymentMethodOptions.map((method) => (
+                            <SelectItem key={method.value} value={method.value}>
+                              {method.label}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -464,7 +474,7 @@ const Payments = () => {
                       <TableCell className="font-mono text-sm">{payment.admission_number || "-"}</TableCell>
                       <TableCell className="font-medium">{payment.student_name}</TableCell>
                       <TableCell className="text-success font-semibold">{formatCurrency(payment.amount)}</TableCell>
-                      <TableCell>{payment.payment_method}</TableCell>
+                      <TableCell>{getPaymentMethodLabel(payment.payment_method)}</TableCell>
                       <TableCell>{formatDate(payment.payment_date)}</TableCell>
                       <TableCell className="text-muted-foreground max-w-32 truncate">{payment.notes || "-"}</TableCell>
                       <TableCell>
