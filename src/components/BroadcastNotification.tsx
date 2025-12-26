@@ -71,7 +71,7 @@ const BroadcastNotification = () => {
   return <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5 text-secondary-foreground" />
+          <Bell className="h-5 w-5 text-primary-foreground dark:text-foreground" />
           {unreadCount > 0 && <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive">
               {unreadCount}
             </Badge>}
