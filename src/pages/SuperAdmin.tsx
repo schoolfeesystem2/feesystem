@@ -13,10 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Building2, Users, CheckCircle, Clock, XCircle, LogOut, Send, Settings, Loader2, Trash2 } from "lucide-react";
+import { Building2, Users, CheckCircle, Clock, XCircle, LogOut, Send, Settings, Loader2, Trash2, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import ThemeToggle from "@/components/ThemeToggle";
 import appIcon from "@/assets/app-icon.png";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+
 interface School {
   id: string;
   school_name: string;
@@ -29,6 +31,7 @@ interface School {
   last_active: string | null;
   max_students: number | null;
 }
+
 const SuperAdmin = () => {
   const {
     toast
@@ -52,6 +55,9 @@ const SuperAdmin = () => {
   const [manageStatus, setManageStatus] = useState("trial");
   const [manageMaxStudents, setManageMaxStudents] = useState(200);
   const [manageDuration, setManageDuration] = useState("1year");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingSchoolId, setDeletingSchoolId] = useState<string | null>(null);
   useEffect(() => {
     checkSuperAdminStatus();
   }, [user]);
@@ -176,7 +182,11 @@ const SuperAdmin = () => {
         max_students: manageMaxStudents
       };
       if (manageStatus === 'active') {
-        updateData.subscription_end_date = new Date(Date.now() + getDurationInMs(manageDuration)).toISOString();
+        if (manageDuration === 'custom' && customEndDate) {
+          updateData.subscription_end_date = new Date(customEndDate).toISOString();
+        } else {
+          updateData.subscription_end_date = new Date(Date.now() + getDurationInMs(manageDuration)).toISOString();
+        }
       }
       const {
         error
@@ -229,12 +239,15 @@ const SuperAdmin = () => {
       setUpdatingStatus(false);
     }
   };
-  const handleDeleteSchool = async (schoolId: string) => {
-    if (!confirm('Are you sure you want to delete this school? This action cannot be undone.')) return;
+  const handleDeleteClick = (schoolId: string) => {
+    setDeletingSchoolId(schoolId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingSchoolId) return;
     try {
-      const {
-        error
-      } = await supabase.from('profiles').delete().eq('id', schoolId);
+      const { error } = await supabase.from('profiles').delete().eq('id', deletingSchoolId);
       if (error) throw error;
       toast({
         title: "Success",
@@ -247,6 +260,9 @@ const SuperAdmin = () => {
         description: error.message,
         variant: "destructive"
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingSchoolId(null);
     }
   };
   const handleSendBroadcast = async () => {
@@ -422,7 +438,7 @@ const SuperAdmin = () => {
                           }}>
                                   <XCircle className="h-4 w-4 mr-1" /> Deactivate
                                 </Button>}
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteSchool(school.id)}>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(school.id)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </div>
@@ -559,9 +575,22 @@ const SuperAdmin = () => {
                     <SelectItem value="6months">6 Months</SelectItem>
                     <SelectItem value="1year">1 Year</SelectItem>
                     <SelectItem value="2years">2 Years</SelectItem>
+                    <SelectItem value="custom">Custom Date</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {manageDuration === 'custom' && (
+                <div className="space-y-2">
+                  <Label>Custom End Date</Label>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    min={format(new Date(), 'yyyy-MM-dd')}
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setManageDialogOpen(false)}>Cancel</Button>
@@ -572,6 +601,14 @@ const SuperAdmin = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <DeleteConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={handleDeleteConfirm}
+          title="Delete School"
+          description="Are you sure you want to delete this school? This action cannot be undone and will remove all associated data."
+        />
       </main>
     </div>;
 };

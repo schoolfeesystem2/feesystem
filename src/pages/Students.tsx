@@ -6,11 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Users, AlertTriangle } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 interface Student {
   id: string;
@@ -42,6 +45,9 @@ const Students = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
+  const [maxStudents, setMaxStudents] = useState<number>(200);
 
   const [formData, setFormData] = useState({
     admission_number: "",
@@ -55,8 +61,24 @@ const Students = () => {
     if (user) {
       fetchStudents();
       fetchClasses();
+      fetchUserLimits();
     }
   }, [user]);
+
+  const fetchUserLimits = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('max_students')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setMaxStudents(data?.max_students || 200);
+    } catch (error) {
+      console.error('Error fetching user limits:', error);
+    }
+  };
 
   const fetchStudents = async () => {
     try {
@@ -148,6 +170,16 @@ const Students = () => {
       return;
     }
 
+    // Check student limit when adding new student
+    if (!editingStudent && students.length >= maxStudents) {
+      toast({
+        title: "Student Limit Reached",
+        description: `You have reached your maximum limit of ${maxStudents} students. Please upgrade your plan to add more students.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       if (editingStudent) {
         const { error } = await supabase
@@ -211,12 +243,19 @@ const Students = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteClick = (id: string) => {
+    setDeletingStudentId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingStudentId) return;
+    
     try {
       const { error } = await supabase
         .from('students')
         .delete()
-        .eq('id', id);
+        .eq('id', deletingStudentId);
 
       if (error) throw error;
       toast({ title: "Success", description: "Student deleted successfully" });
@@ -227,8 +266,14 @@ const Students = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingStudentId(null);
     }
   };
+
+  const studentsUsedPercentage = (students.length / maxStudents) * 100;
+  const studentsRemaining = maxStudents - students.length;
 
   return (
     <div className="space-y-6">
@@ -239,6 +284,39 @@ const Students = () => {
           <p className="text-muted-foreground">Manage student records and enrollments</p>
         </div>
       </div>
+
+      {/* Student Usage Status Card */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-primary/10">
+                <Users className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Student Usage</p>
+                <p className="text-xl font-bold">{students.length} / {maxStudents}</p>
+              </div>
+            </div>
+            <div className="flex-1 max-w-md">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-muted-foreground">Used: {students.length}</span>
+                <span className="text-muted-foreground">Remaining: {studentsRemaining}</span>
+              </div>
+              <Progress value={studentsUsedPercentage} className="h-2" />
+              {studentsUsedPercentage >= 90 && (
+                <div className="flex items-center gap-1 mt-2 text-sm text-yellow-600 dark:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>{studentsUsedPercentage >= 100 ? "Limit reached!" : "Approaching limit!"}</span>
+                </div>
+              )}
+            </div>
+            {studentsRemaining <= 0 && (
+              <Badge variant="destructive">Limit Reached</Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -364,7 +442,7 @@ const Students = () => {
                           <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(student)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(student.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(student.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
@@ -404,6 +482,14 @@ const Students = () => {
           )}
         </CardContent>
       </Card>
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Student"
+        description="Are you sure you want to delete this student? This action cannot be undone and will also delete all associated payment records."
+      />
     </div>
   );
 };

@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Plus, Search, Receipt, ChevronLeft, ChevronRight, Pencil, Download, FileSpreadsheet, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 interface Payment {
   id: string;
@@ -52,6 +53,8 @@ const Payments = () => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClassId, setSelectedClassId] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
   const paymentMethodOptions = [
     { value: "cash", label: "Cash" },
@@ -237,20 +240,28 @@ const Payments = () => {
     }
   };
 
-  const handleDeletePayment = async (paymentId: string) => {
-    if (!confirm('Are you sure you want to delete this payment record?')) return;
+  const handleDeleteClick = (paymentId: string) => {
+    setDeletingPaymentId(paymentId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingPaymentId) return;
 
     try {
       const { error } = await supabase
         .from('payments')
         .delete()
-        .eq('id', paymentId);
+        .eq('id', deletingPaymentId);
 
       if (error) throw error;
       toast({ title: "Success", description: "Payment deleted successfully" });
       fetchPayments();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingPaymentId(null);
     }
   };
 
@@ -499,7 +510,7 @@ const Payments = () => {
                           <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(payment)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeletePayment(payment.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(payment.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
@@ -538,6 +549,14 @@ const Payments = () => {
           )}
         </CardContent>
       </Card>
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Payment"
+        description="Are you sure you want to delete this payment record? This action cannot be undone."
+      />
     </div>
   );
 };

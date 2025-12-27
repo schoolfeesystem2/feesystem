@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, Pencil, Trash2, DollarSign, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 interface FeeStructure {
   id: string;
@@ -25,6 +26,8 @@ const FeeStructure = () => {
   const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingStructureId, setDeletingStructureId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -121,12 +124,19 @@ const FeeStructure = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteClick = (id: string) => {
+    setDeletingStructureId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingStructureId) return;
+    
     try {
       const { error } = await supabase
         .from('classes')
         .delete()
-        .eq('id', id);
+        .eq('id', deletingStructureId);
 
       if (error) throw error;
       toast({ title: "Success", description: "Fee structure deleted successfully" });
@@ -137,6 +147,9 @@ const FeeStructure = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingStructureId(null);
     }
   };
 
@@ -266,7 +279,7 @@ const FeeStructure = () => {
                         <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(structure)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(structure.id)}>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(structure.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -287,6 +300,14 @@ const FeeStructure = () => {
           )}
         </CardContent>
       </Card>
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Fee Structure"
+        description="Are you sure you want to delete this fee structure? This may affect students assigned to this class."
+      />
     </div>
   );
 };
