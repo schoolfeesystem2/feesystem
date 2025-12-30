@@ -6,7 +6,7 @@ import { Users, DollarSign, TrendingUp, AlertCircle, Calendar } from "lucide-rea
 import { formatCurrency } from "@/lib/formatters";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import appIcon from "@/assets/app-icon.png";
+import appLogo from "@/assets/app-logo.png";
 import MonthlyTargetCard from "@/components/dashboard/MonthlyTargetCard";
 import CollectionChart from "@/components/dashboard/CollectionChart";
 import MonthlyAnalysis from "@/components/dashboard/MonthlyAnalysis";
@@ -138,7 +138,7 @@ const Dashboard = () => {
   if (loading) {
     return <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <img src={appIcon} alt="School Fee System" className="h-12 w-12 object-contain" />
+          <img src={appLogo} alt="School Fee System" className="h-12 w-12 object-contain" />
           <div>
             <h1 className="text-2xl font-bold">{schoolName}</h1>
             <p className="text-muted-foreground">Loading...</p>
@@ -150,7 +150,7 @@ const Dashboard = () => {
       {/* Header with Subscription Status */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <img alt="School Fee System" className="h-12 w-12 object-contain" src="/lovable-uploads/cef3a25c-3e59-43de-9e23-bbd4bd027de0.png" />
+          <img src={appLogo} alt="School Fee System" className="h-12 w-12 object-contain" />
           <div>
             <h1 className="text-2xl font-bold">{schoolName}</h1>
             <p className="text-muted-foreground">Welcome back! Here's your school's financial overview.</p>
