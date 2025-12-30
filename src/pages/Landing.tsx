@@ -1,9 +1,21 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, DollarSign, BarChart3, Shield, ArrowRight, CheckCircle } from "lucide-react";
 import appLogo from "@/assets/app-logo.png";
+import { useAuth } from "@/hooks/useAuth";
+
 const Landing = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
   const features = [{
     icon: Users,
     title: "Student Management",
@@ -22,6 +34,16 @@ const Landing = () => {
     description: "Your data is protected with enterprise-grade security and regular backups."
   }];
   const benefits = ["Real-time dashboard with financial overview", "Monthly target tracking and progress", "Automated fee structure management", "Payment history and receipt generation", "Multi-class fee configuration", "Subscription-based flexible plans"];
+  
+  // Show loading spinner while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <img src={appLogo} alt="Loading..." className="h-16 w-16 animate-pulse" />
+      </div>
+    );
+  }
+
   return <div className="min-h-screen gradient-hero">
       {/* Header */}
       <header className="container mx-auto px-4 py-6">
