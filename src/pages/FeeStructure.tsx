@@ -267,40 +267,6 @@ const FeeStructure = () => {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Academic Year *</Label>
-                      <Select 
-                        value={formData.academic_year} 
-                        onValueChange={(value) => setFormData({ ...formData, academic_year: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {yearOptions.map((year) => (
-                            <SelectItem key={year} value={year}>{year}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Term *</Label>
-                      <Select 
-                        value={formData.term} 
-                        onValueChange={(value) => setFormData({ ...formData, term: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Term" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TERMS.map((term) => (
-                            <SelectItem key={term} value={term}>{term}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
                   <div className="space-y-2">
                     <Label>Class Name *</Label>
                     <Input
