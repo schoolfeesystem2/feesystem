@@ -67,6 +67,13 @@ const BroadcastNotification = () => {
       localStorage.setItem(`read_broadcasts_${user.id}`, JSON.stringify(allIds));
     }
   };
+  // When dialog opens, mark all messages as read
+  useEffect(() => {
+    if (dialogOpen && messages.length > 0) {
+      markAllAsRead();
+    }
+  }, [dialogOpen]);
+
   if (messages.length === 0) return null;
   return <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
