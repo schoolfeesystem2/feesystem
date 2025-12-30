@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Pencil, Trash2, DollarSign, Loader2, Filter } from "lucide-react";
+import { Plus, Pencil, Trash2, DollarSign, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
@@ -43,10 +43,6 @@ const FeeStructure = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingStructureId, setDeletingStructureId] = useState<string | null>(null);
 
-  // Filter states
-  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
-  const [filterTerm, setFilterTerm] = useState<string>("Term 1");
-
   const [formData, setFormData] = useState({
     name: "",
     monthly_fee: "",
@@ -60,15 +56,15 @@ const FeeStructure = () => {
     if (user) {
       fetchFeeStructures();
     }
-  }, [user, filterYear, filterTerm]);
+  }, [user]);
 
   const fetchFeeStructures = async () => {
     try {
       const { data, error } = await supabase
         .from('classes')
         .select('id, name, monthly_fee, academic_year, term')
-        .eq('academic_year', filterYear)
-        .eq('term', filterTerm)
+        .order('academic_year', { ascending: false })
+        .order('term')
         .order('name');
 
       if (error) throw error;
@@ -84,8 +80,8 @@ const FeeStructure = () => {
     setFormData({ 
       name: "", 
       monthly_fee: "",
-      academic_year: filterYear,
-      term: filterTerm,
+      academic_year: new Date().getFullYear().toString(),
+      term: "Term 1",
     });
     setEditingStructure(null);
   };
@@ -155,10 +151,6 @@ const FeeStructure = () => {
         toast({ title: "Success", description: "Fee structure added successfully" });
       }
 
-      // Update filters to match the saved structure
-      setFilterYear(formData.academic_year);
-      setFilterTerm(formData.term);
-      
       await fetchFeeStructures();
       setIsDialogOpen(false);
       resetForm();
@@ -228,46 +220,6 @@ const FeeStructure = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-sm font-medium">Filter by Year & Term</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <div className="w-full sm:w-auto">
-              <Label className="text-xs text-muted-foreground">Academic Year</Label>
-              <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="w-full sm:w-[140px]">
-                  <SelectValue placeholder="Select Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full sm:w-auto">
-              <Label className="text-xs text-muted-foreground">Term</Label>
-              <Select value={filterTerm} onValueChange={setFilterTerm}>
-                <SelectTrigger className="w-full sm:w-[140px]">
-                  <SelectValue placeholder="Select Term" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TERMS.map((term) => (
-                    <SelectItem key={term} value={term}>{term}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {feeStructures.length > 0 && (
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
@@ -276,7 +228,6 @@ const FeeStructure = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{feeStructures.length}</div>
-              <p className="text-xs text-muted-foreground">{filterYear} - {filterTerm}</p>
             </CardContent>
           </Card>
           <Card>
@@ -301,7 +252,7 @@ const FeeStructure = () => {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Fee Structures - {filterYear} {filterTerm}</CardTitle>
+            <CardTitle>Fee Structures</CardTitle>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => handleOpenDialog()}>
@@ -389,6 +340,8 @@ const FeeStructure = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Class</TableHead>
+                  <TableHead>Year</TableHead>
+                  <TableHead>Term</TableHead>
                   <TableHead>Monthly Fee</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -397,6 +350,8 @@ const FeeStructure = () => {
                 {feeStructures.map((structure) => (
                   <TableRow key={structure.id}>
                     <TableCell className="font-medium">{structure.name}</TableCell>
+                    <TableCell>{structure.academic_year}</TableCell>
+                    <TableCell>{structure.term}</TableCell>
                     <TableCell className="text-primary font-semibold">{formatCurrency(structure.monthly_fee)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -415,8 +370,8 @@ const FeeStructure = () => {
           ) : (
             <div className="text-center py-12">
               <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Fee Structures for {filterYear} {filterTerm}</h3>
-              <p className="text-muted-foreground mb-4">Add a fee structure for this academic year and term.</p>
+              <h3 className="text-lg font-semibold mb-2">No Fee Structures</h3>
+              <p className="text-muted-foreground mb-4">Add a fee structure to get started.</p>
               <Button onClick={() => handleOpenDialog()}>
                 <Plus className="h-4 w-4 mr-2" /> Add Fee Structure
               </Button>

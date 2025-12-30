@@ -37,6 +37,7 @@ interface Student {
 interface Class {
   id: string;
   name: string;
+  monthly_fee: number;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -55,6 +56,8 @@ const Payments = () => {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+  const [studentFeeInfo, setStudentFeeInfo] = useState<{ totalFee: number; alreadyPaid: number; balance: number } | null>(null);
+  const [loadingFeeInfo, setLoadingFeeInfo] = useState(false);
 
   const paymentMethodOptions = [
     { value: "cash", label: "Cash" },
@@ -85,13 +88,40 @@ const Payments = () => {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('id, name')
+        .select('id, name, monthly_fee')
         .order('name');
 
       if (error) throw error;
       setClasses(data || []);
     } catch (error) {
       console.error('Error fetching classes:', error);
+    }
+  };
+
+  const fetchStudentFeeInfo = async (studentId: string, classId: string) => {
+    setLoadingFeeInfo(true);
+    try {
+      // Get the class fee
+      const selectedClass = classes.find(c => c.id === classId);
+      const totalFee = selectedClass?.monthly_fee || 0;
+
+      // Get total payments for this student
+      const { data: paymentsData, error } = await supabase
+        .from('payments')
+        .select('amount')
+        .eq('student_id', studentId);
+
+      if (error) throw error;
+
+      const alreadyPaid = paymentsData?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const balance = totalFee - alreadyPaid;
+
+      setStudentFeeInfo({ totalFee, alreadyPaid, balance });
+    } catch (error) {
+      console.error('Error fetching student fee info:', error);
+      setStudentFeeInfo(null);
+    } finally {
+      setLoadingFeeInfo(false);
     }
   };
 
@@ -162,6 +192,7 @@ const Payments = () => {
     setFormData({ student_id: "", amount: "", payment_method: "", notes: "" });
     setSelectedClassId("");
     setEditingPayment(null);
+    setStudentFeeInfo(null);
   };
 
   const handleOpenDialog = (payment?: Payment) => {
@@ -187,6 +218,16 @@ const Payments = () => {
   const handleClassChange = (classId: string) => {
     setSelectedClassId(classId);
     setFormData({ ...formData, student_id: "" }); // Reset student selection when class changes
+    setStudentFeeInfo(null);
+  };
+
+  const handleStudentChange = (studentId: string) => {
+    setFormData({ ...formData, student_id: studentId });
+    if (studentId && selectedClassId) {
+      fetchStudentFeeInfo(studentId, selectedClassId);
+    } else {
+      setStudentFeeInfo(null);
+    }
   };
 
   const handleSave = async () => {
@@ -393,7 +434,7 @@ const Payments = () => {
                       <Label>Select Student *</Label>
                       <Select 
                         value={formData.student_id} 
-                        onValueChange={(val) => setFormData({ ...formData, student_id: val })}
+                        onValueChange={handleStudentChange}
                         disabled={!selectedClassId}
                       >
                         <SelectTrigger>
@@ -410,8 +451,8 @@ const Payments = () => {
                     </div>
 
                     {selectedStudent && (
-                      <Card className="bg-muted/50">
-                        <CardContent className="p-4 space-y-2">
+                      <Card className="bg-muted/50 border-primary/20">
+                        <CardContent className="p-4 space-y-3">
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Student Name:</span>
@@ -422,6 +463,27 @@ const Payments = () => {
                               <p className="font-medium">{selectedStudent.admission_number || 'N/A'}</p>
                             </div>
                           </div>
+                          
+                          {loadingFeeInfo ? (
+                            <div className="text-sm text-muted-foreground">Loading fee info...</div>
+                          ) : studentFeeInfo && (
+                            <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                              <div className="text-center">
+                                <span className="text-xs text-muted-foreground block">Total Fee</span>
+                                <p className="font-semibold text-sm">{formatCurrency(studentFeeInfo.totalFee)}</p>
+                              </div>
+                              <div className="text-center">
+                                <span className="text-xs text-muted-foreground block">Already Paid</span>
+                                <p className="font-semibold text-sm text-green-600">{formatCurrency(studentFeeInfo.alreadyPaid)}</p>
+                              </div>
+                              <div className="text-center">
+                                <span className="text-xs text-muted-foreground block">Balance</span>
+                                <p className={`font-semibold text-sm ${studentFeeInfo.balance > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                                  {formatCurrency(studentFeeInfo.balance)}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     )}
