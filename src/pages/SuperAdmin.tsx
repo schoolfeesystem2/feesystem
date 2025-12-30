@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Building2, Users, CheckCircle, Clock, XCircle, LogOut, Send, Settings, Loader2, Trash2, Calendar } from "lucide-react";
+import { Building2, Users, CheckCircle, Clock, XCircle, LogOut, Send, Settings, Loader2, Trash2, Calendar, Upload, Video, Smartphone, UserCircle } from "lucide-react";
 import { format } from "date-fns";
 import ThemeToggle from "@/components/ThemeToggle";
 import appIcon from "@/assets/app-icon.png";
@@ -58,8 +58,19 @@ const SuperAdmin = () => {
   const [customEndDate, setCustomEndDate] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingSchoolId, setDeletingSchoolId] = useState<string | null>(null);
+  
+  // Targeted messaging
+  const [broadcastTarget, setBroadcastTarget] = useState<string>("all");
+  
+  // App settings
+  const [apkUrl, setApkUrl] = useState<string>("");
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [uploadingApk, setUploadingApk] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   useEffect(() => {
     checkSuperAdminStatus();
+    fetchAppSettings();
   }, [user]);
 
   // Set up realtime subscription for profiles updates
@@ -128,6 +139,108 @@ const SuperAdmin = () => {
       console.error('Error fetching schools:', error);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchAppSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings' as any)
+        .select('key, value')
+        .in('key', ['android_apk_url', 'demo_video_url']);
+
+      if (error) throw error;
+
+      (data as any[])?.forEach((setting: { key: string; value: string | null }) => {
+        if (setting.key === 'android_apk_url') setApkUrl(setting.value || '');
+        if (setting.key === 'demo_video_url') setVideoUrl(setting.value || '');
+      });
+    } catch (error) {
+      console.error('Error fetching app settings:', error);
+    }
+  };
+
+  const handleApkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.apk')) {
+      toast({
+        title: "Invalid file",
+        description: "Please upload an APK file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploadingApk(true);
+    try {
+      // Delete old APK if exists
+      const { data: existingFiles } = await supabase.storage
+        .from('app-files')
+        .list('', { search: 'app' });
+
+      if (existingFiles && existingFiles.length > 0) {
+        await supabase.storage
+          .from('app-files')
+          .remove(existingFiles.map(f => f.name));
+      }
+
+      // Upload new APK
+      const fileName = `app-${Date.now()}.apk`;
+      const { error: uploadError } = await supabase.storage
+        .from('app-files')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('app-files')
+        .getPublicUrl(fileName);
+
+      // Save URL to settings
+      await supabase
+        .from('app_settings' as any)
+        .update({ value: publicUrl, updated_at: new Date().toISOString(), updated_by: user?.id })
+        .eq('key', 'android_apk_url');
+
+      setApkUrl(publicUrl);
+      toast({
+        title: "Success",
+        description: "APK uploaded successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingApk(false);
+    }
+  };
+
+  const handleSaveVideoUrl = async () => {
+    setSavingSettings(true);
+    try {
+      await supabase
+        .from('app_settings' as any)
+        .update({ value: videoUrl, updated_at: new Date().toISOString(), updated_by: user?.id })
+        .eq('key', 'demo_video_url');
+
+      toast({
+        title: "Success",
+        description: "Demo video URL saved successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSavingSettings(false);
     }
   };
   const getStatusBadge = (status: string | null) => {
@@ -276,21 +389,27 @@ const SuperAdmin = () => {
     }
     setSendingBroadcast(true);
     try {
-      const {
-        error
-      } = await supabase.from('broadcast_messages').insert({
+      const insertData: any = {
         title: broadcastTitle,
         message: broadcastMessage,
-        created_by: user?.id
-      });
+        created_by: user?.id,
+        target_user_id: broadcastTarget === 'all' ? null : broadcastTarget
+      };
+      
+      const {
+        error
+      } = await supabase.from('broadcast_messages').insert(insertData);
       if (error) throw error;
       toast({
         title: "Success",
-        description: "Broadcast message sent to all users"
+        description: broadcastTarget === 'all' 
+          ? "Broadcast message sent to all subscribed users" 
+          : "Message sent to selected user"
       });
       setBroadcastDialogOpen(false);
       setBroadcastTitle("");
       setBroadcastMessage("");
+      setBroadcastTarget("all");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -387,6 +506,9 @@ const SuperAdmin = () => {
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" /> Users
+            </TabsTrigger>
+            <TabsTrigger value="app-settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" /> App Settings
             </TabsTrigger>
           </TabsList>
 
@@ -487,6 +609,68 @@ const SuperAdmin = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="app-settings">
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* APK Upload */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Smartphone className="h-5 w-5" /> Android App (APK)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Current APK URL</Label>
+                    <Input value={apkUrl} readOnly className="mt-1" placeholder="No APK uploaded yet" />
+                  </div>
+                  <div>
+                    <Label>Upload New APK</Label>
+                    <div className="mt-1">
+                      <input
+                        type="file"
+                        accept=".apk"
+                        onChange={handleApkUpload}
+                        className="hidden"
+                        id="apk-upload"
+                        disabled={uploadingApk}
+                      />
+                      <Button asChild disabled={uploadingApk}>
+                        <label htmlFor="apk-upload" className="cursor-pointer">
+                          {uploadingApk ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                          {uploadingApk ? "Uploading..." : "Choose APK File"}
+                        </label>
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Demo Video URL */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Video className="h-5 w-5" /> Demo Video
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>YouTube Video URL</Label>
+                    <Input 
+                      value={videoUrl} 
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      className="mt-1" 
+                      placeholder="https://www.youtube.com/watch?v=..." 
+                    />
+                  </div>
+                  <Button onClick={handleSaveVideoUrl} disabled={savingSettings}>
+                    {savingSettings ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Save Video URL
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
 
         {/* Broadcast Message Button */}
@@ -499,9 +683,33 @@ const SuperAdmin = () => {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Send Broadcast Message</DialogTitle>
-              <DialogDescription>Send a message to all app users</DialogDescription>
+              <DialogDescription>Send a message to subscribed users or a specific user</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Send To</Label>
+                <Select value={broadcastTarget} onValueChange={setBroadcastTarget}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover max-h-60">
+                    <SelectItem value="all">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        All Subscribed Users
+                      </div>
+                    </SelectItem>
+                    {schools.filter(s => s.subscription_status === 'active').map(school => (
+                      <SelectItem key={school.id} value={school.id}>
+                        <div className="flex items-center gap-2">
+                          <UserCircle className="h-4 w-4" />
+                          {school.school_name || school.email}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>Title</Label>
                 <Input value={broadcastTitle} onChange={e => setBroadcastTitle(e.target.value)} placeholder="Message title..." />
