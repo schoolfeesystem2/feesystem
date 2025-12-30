@@ -174,6 +174,11 @@ const SuperAdmin = () => {
     }
 
     setUploadingApk(true);
+    toast({
+      title: "Uploading...",
+      description: "Please wait while the APK is being uploaded"
+    });
+
     try {
       // Delete old APK if exists
       const { data: existingFiles } = await supabase.storage
@@ -199,35 +204,50 @@ const SuperAdmin = () => {
         .from('app-files')
         .getPublicUrl(fileName);
 
-      // Save URL to settings
-      await supabase
+      // Save URL to settings using upsert
+      const { error: upsertError } = await supabase
         .from('app_settings' as any)
-        .update({ value: publicUrl, updated_at: new Date().toISOString(), updated_by: user?.id })
-        .eq('key', 'android_apk_url');
+        .upsert({ 
+          key: 'android_apk_url',
+          value: publicUrl, 
+          updated_at: new Date().toISOString(), 
+          updated_by: user?.id 
+        }, { onConflict: 'key' });
+
+      if (upsertError) throw upsertError;
 
       setApkUrl(publicUrl);
       toast({
-        title: "Success",
-        description: "APK uploaded successfully"
+        title: "Upload Complete!",
+        description: "APK has been uploaded and is now available for users to download"
       });
     } catch (error: any) {
+      console.error('APK upload error:', error);
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Upload Failed",
+        description: error.message || "Failed to upload APK. Please try again.",
         variant: "destructive"
       });
     } finally {
       setUploadingApk(false);
+      // Reset the file input
+      event.target.value = '';
     }
   };
 
   const handleSaveVideoUrl = async () => {
     setSavingSettings(true);
     try {
-      await supabase
+      const { error } = await supabase
         .from('app_settings' as any)
-        .update({ value: videoUrl, updated_at: new Date().toISOString(), updated_by: user?.id })
-        .eq('key', 'demo_video_url');
+        .upsert({ 
+          key: 'demo_video_url',
+          value: videoUrl, 
+          updated_at: new Date().toISOString(), 
+          updated_by: user?.id 
+        }, { onConflict: 'key' });
+
+      if (error) throw error;
 
       toast({
         title: "Success",
