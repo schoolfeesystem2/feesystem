@@ -43,29 +43,35 @@ export type Database = {
       }
       classes: {
         Row: {
+          academic_year: string
           annual_fee: number
           created_at: string
           id: string
           monthly_fee: number
           name: string
+          term: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          academic_year?: string
           annual_fee?: number
           created_at?: string
           id?: string
           monthly_fee?: number
           name: string
+          term?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          academic_year?: string
           annual_fee?: number
           created_at?: string
           id?: string
           monthly_fee?: number
           name?: string
+          term?: string
           updated_at?: string
           user_id?: string
         }

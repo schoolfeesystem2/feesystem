@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Pencil, Trash2, DollarSign, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, DollarSign, Loader2, Filter } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
@@ -16,7 +17,20 @@ interface FeeStructure {
   id: string;
   name: string;
   monthly_fee: number;
+  academic_year: string;
+  term: string;
 }
+
+const TERMS = ["Term 1", "Term 2", "Term 3"];
+
+const generateYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  const years: string[] = [];
+  for (let i = currentYear - 2; i <= currentYear + 2; i++) {
+    years.push(i.toString());
+  }
+  return years;
+};
 
 const FeeStructure = () => {
   const { toast } = useToast();
@@ -29,22 +43,32 @@ const FeeStructure = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingStructureId, setDeletingStructureId] = useState<string | null>(null);
 
+  // Filter states
+  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [filterTerm, setFilterTerm] = useState<string>("Term 1");
+
   const [formData, setFormData] = useState({
     name: "",
     monthly_fee: "",
+    academic_year: new Date().getFullYear().toString(),
+    term: "Term 1",
   });
+
+  const yearOptions = generateYearOptions();
 
   useEffect(() => {
     if (user) {
       fetchFeeStructures();
     }
-  }, [user]);
+  }, [user, filterYear, filterTerm]);
 
   const fetchFeeStructures = async () => {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('id, name, monthly_fee')
+        .select('id, name, monthly_fee, academic_year, term')
+        .eq('academic_year', filterYear)
+        .eq('term', filterTerm)
         .order('name');
 
       if (error) throw error;
@@ -57,7 +81,12 @@ const FeeStructure = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", monthly_fee: "" });
+    setFormData({ 
+      name: "", 
+      monthly_fee: "",
+      academic_year: filterYear,
+      term: filterTerm,
+    });
     setEditingStructure(null);
   };
 
@@ -67,6 +96,8 @@ const FeeStructure = () => {
       setFormData({
         name: structure.name,
         monthly_fee: structure.monthly_fee.toString(),
+        academic_year: structure.academic_year,
+        term: structure.term,
       });
     } else {
       resetForm();
@@ -75,7 +106,7 @@ const FeeStructure = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.monthly_fee) {
+    if (!formData.name || !formData.monthly_fee || !formData.academic_year || !formData.term) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -92,10 +123,17 @@ const FeeStructure = () => {
           .update({
             name: formData.name,
             monthly_fee: Number(formData.monthly_fee),
+            academic_year: formData.academic_year,
+            term: formData.term,
           })
           .eq('id', editingStructure.id);
 
-        if (error) throw error;
+        if (error) {
+          if (error.code === '23505') {
+            throw new Error(`A fee structure for ${formData.name} in ${formData.academic_year} ${formData.term} already exists.`);
+          }
+          throw error;
+        }
         toast({ title: "Success", description: "Fee structure updated successfully" });
       } else {
         const { error } = await supabase
@@ -103,13 +141,24 @@ const FeeStructure = () => {
           .insert({
             name: formData.name,
             monthly_fee: Number(formData.monthly_fee),
+            academic_year: formData.academic_year,
+            term: formData.term,
             user_id: user?.id,
           });
 
-        if (error) throw error;
+        if (error) {
+          if (error.code === '23505') {
+            throw new Error(`A fee structure for ${formData.name} in ${formData.academic_year} ${formData.term} already exists.`);
+          }
+          throw error;
+        }
         toast({ title: "Success", description: "Fee structure added successfully" });
       }
 
+      // Update filters to match the saved structure
+      setFilterYear(formData.academic_year);
+      setFilterTerm(formData.term);
+      
       await fetchFeeStructures();
       setIsDialogOpen(false);
       resetForm();
@@ -179,6 +228,46 @@ const FeeStructure = () => {
         </div>
       </div>
 
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Filter by Year & Term</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <div className="w-full sm:w-auto">
+              <Label className="text-xs text-muted-foreground">Academic Year</Label>
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="Select Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full sm:w-auto">
+              <Label className="text-xs text-muted-foreground">Term</Label>
+              <Select value={filterTerm} onValueChange={setFilterTerm}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="Select Term" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TERMS.map((term) => (
+                    <SelectItem key={term} value={term}>{term}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {feeStructures.length > 0 && (
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
@@ -187,6 +276,7 @@ const FeeStructure = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{feeStructures.length}</div>
+              <p className="text-xs text-muted-foreground">{filterYear} - {filterTerm}</p>
             </CardContent>
           </Card>
           <Card>
@@ -211,7 +301,7 @@ const FeeStructure = () => {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Fee Structures</CardTitle>
+            <CardTitle>Fee Structures - {filterYear} {filterTerm}</CardTitle>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => handleOpenDialog()}>
@@ -226,6 +316,40 @@ const FeeStructure = () => {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Academic Year *</Label>
+                      <Select 
+                        value={formData.academic_year} 
+                        onValueChange={(value) => setFormData({ ...formData, academic_year: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {yearOptions.map((year) => (
+                            <SelectItem key={year} value={year}>{year}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Term *</Label>
+                      <Select 
+                        value={formData.term} 
+                        onValueChange={(value) => setFormData({ ...formData, term: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Term" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TERMS.map((term) => (
+                            <SelectItem key={term} value={term}>{term}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label>Class Name *</Label>
                     <Input
@@ -291,8 +415,8 @@ const FeeStructure = () => {
           ) : (
             <div className="text-center py-12">
               <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Fee Structures Yet</h3>
-              <p className="text-muted-foreground mb-4">Add your first class fee structure to get started.</p>
+              <h3 className="text-lg font-semibold mb-2">No Fee Structures for {filterYear} {filterTerm}</h3>
+              <p className="text-muted-foreground mb-4">Add a fee structure for this academic year and term.</p>
               <Button onClick={() => handleOpenDialog()}>
                 <Plus className="h-4 w-4 mr-2" /> Add Fee Structure
               </Button>
