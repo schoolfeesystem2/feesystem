@@ -18,7 +18,8 @@ import {
   Menu,
   X,
   Loader2,
-  CreditCard
+  CreditCard,
+  Info
 } from "lucide-react";
 import appLogo from "@/assets/app-logo.png";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ const MainLayout = () => {
     { icon: BarChart3, label: "Reports", path: "/reports" },
     { icon: CreditCard, label: "Billing", path: "/billing" },
     { icon: Settings, label: "Settings", path: "/settings" },
+    { icon: Info, label: "About Us", path: "/about" },
     { icon: Phone, label: "Contact Us", path: "/contact" },
   ];
 

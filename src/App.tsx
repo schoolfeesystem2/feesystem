@@ -17,6 +17,7 @@ import Reports from "./pages/Reports";
 import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import Contact from "./pages/Contact";
+import AboutUs from "./pages/AboutUs";
 import SuperAdmin from "./pages/SuperAdmin";
 import SuperAdminAuth from "./pages/SuperAdminAuth";
 import NotFound from "./pages/NotFound";
@@ -53,6 +54,7 @@ const App = () => (
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/billing" element={<Billing />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/about" element={<AboutUs />} />
                 <Route path="/contact" element={<Contact />} />
               </Route>
               <Route path="*" element={<NotFound />} />

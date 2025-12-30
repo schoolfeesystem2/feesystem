@@ -20,6 +20,7 @@ export type Database = {
           created_by: string | null
           id: string
           message: string
+          target_user_id: string | null
           title: string
         }
         Insert: {
@@ -27,6 +28,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           message: string
+          target_user_id?: string | null
           title: string
         }
         Update: {
@@ -34,6 +36,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           message?: string
+          target_user_id?: string | null
           title?: string
         }
         Relationships: []
@@ -250,6 +253,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      subscription_status_check: { Args: { _user_id: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user" | "super_admin"
