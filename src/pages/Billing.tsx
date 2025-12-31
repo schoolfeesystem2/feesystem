@@ -60,7 +60,7 @@ const Billing = () => {
         "Fee management",
         "Payment tracking",
         "Advanced reports",
-        "SMS notifications"
+        "Update Notifications"
       ],
       highlighted: true
     },
@@ -74,7 +74,7 @@ const Billing = () => {
         "Fee management",
         "Payment tracking",
         "Advanced reports",
-        "SMS notifications",
+        "Update Notifications",
         "Priority support"
       ]
     }
