@@ -10,16 +10,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Search, Receipt, ChevronLeft, ChevronRight, Pencil, Download, FileSpreadsheet, Trash2 } from "lucide-react";
+import { Plus, Search, Receipt, ChevronLeft, ChevronRight, Pencil, Download, FileSpreadsheet, Trash2, Printer } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
-
+import { ReceiptModal } from "@/components/receipt/ReceiptModal";
 interface Payment {
   id: string;
   student_id: string;
   student_name: string;
   admission_number: string | null;
+  class_id: string | null;
+  class_name: string;
   amount: number;
   payment_date: string;
   payment_method: string;
@@ -58,6 +60,8 @@ const Payments = () => {
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const [studentFeeInfo, setStudentFeeInfo] = useState<{ totalFee: number; alreadyPaid: number; balance: number } | null>(null);
   const [loadingFeeInfo, setLoadingFeeInfo] = useState(false);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<Payment | null>(null);
 
   const paymentMethodOptions = [
     { value: "cash", label: "Cash" },
@@ -129,22 +133,28 @@ const Payments = () => {
     try {
       const { data, error } = await supabase
         .from('payments')
-        .select('*, students(name, admission_number)')
+        .select('*, students(name, admission_number, class_id)')
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
 
-      const formattedPayments = data?.map((p) => ({
-        id: p.id,
-        student_id: p.student_id,
-        student_name: (p.students as any)?.name || "Unknown",
-        admission_number: (p.students as any)?.admission_number || null,
-        amount: p.amount,
-        payment_date: p.payment_date,
-        payment_method: p.payment_method || "cash",
-        payment_type: p.payment_type || "tuition",
-        notes: p.notes || "",
-      })) || [];
+      const formattedPayments = data?.map((p) => {
+        const studentClassId = (p.students as any)?.class_id || null;
+        const classInfo = classes.find(c => c.id === studentClassId);
+        return {
+          id: p.id,
+          student_id: p.student_id,
+          student_name: (p.students as any)?.name || "Unknown",
+          admission_number: (p.students as any)?.admission_number || null,
+          class_id: studentClassId,
+          class_name: classInfo?.name || "N/A",
+          amount: p.amount,
+          payment_date: p.payment_date,
+          payment_method: p.payment_method || "cash",
+          payment_type: p.payment_type || "tuition",
+          notes: p.notes || "",
+        };
+      }) || [];
 
       setPayments(formattedPayments);
     } catch (error) {
@@ -569,6 +579,17 @@ const Payments = () => {
                       <TableCell className="text-muted-foreground max-w-32 truncate">{payment.notes || "-"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => {
+                              setSelectedPaymentForReceipt(payment);
+                              setReceiptModalOpen(true);
+                            }}
+                            title="Print Receipt"
+                          >
+                            <Printer className="h-4 w-4 text-primary" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(payment)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -618,6 +639,14 @@ const Payments = () => {
         onConfirm={handleDeleteConfirm}
         title="Delete Payment"
         description="Are you sure you want to delete this payment record? This action cannot be undone."
+      />
+
+      <ReceiptModal
+        open={receiptModalOpen}
+        onOpenChange={setReceiptModalOpen}
+        payment={selectedPaymentForReceipt}
+        allStudents={students}
+        classes={classes}
       />
     </div>
   );
