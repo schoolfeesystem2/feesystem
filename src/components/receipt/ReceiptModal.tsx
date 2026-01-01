@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Printer, Download, X, Users, User } from "lucide-react";
+import { Printer, Download, X, Users, User, Search, Eye, EyeOff } from "lucide-react";
 import { 
   ReceiptData, 
   ReceiptSize, 
@@ -91,8 +91,21 @@ export const ReceiptModal = ({
   const [familyStudents, setFamilyStudents] = useState<FamilyStudent[]>([]);
   const [selectedFamilyStudents, setSelectedFamilyStudents] = useState<Set<string>>(new Set());
   const [loadingFamily, setLoadingFamily] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
 
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Filter students based on search
+  const filteredFamilyStudents = useMemo(() => {
+    if (!studentSearch.trim()) return familyStudents;
+    const searchLower = studentSearch.toLowerCase();
+    return familyStudents.filter(
+      (s) =>
+        s.name.toLowerCase().includes(searchLower) ||
+        (s.admission_number && s.admission_number.toLowerCase().includes(searchLower))
+    );
+  }, [familyStudents, studentSearch]);
 
   // Fetch school info
   useEffect(() => {
@@ -363,86 +376,129 @@ export const ReceiptModal = ({
                   </TabsList>
 
                   <TabsContent value="family" className="mt-4">
-                    <div className="border rounded-lg p-3 bg-muted/30">
-                      <Label className="text-sm font-medium mb-2 block">Select siblings/family members:</Label>
+                    <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+                      <Label className="text-base font-bold block">Select siblings/family members:</Label>
+                      
+                      {/* Search Input */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by name or admission number..."
+                          value={studentSearch}
+                          onChange={(e) => setStudentSearch(e.target.value)}
+                          className="pl-10 text-base font-semibold"
+                        />
+                      </div>
+                      
                       {loadingFamily ? (
-                        <p className="text-sm text-muted-foreground">Loading...</p>
+                        <p className="text-base font-medium text-muted-foreground py-4 text-center">Loading...</p>
                       ) : (
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                          {familyStudents.map((student) => (
-                            <div key={student.id} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={student.id}
-                                checked={selectedFamilyStudents.has(student.id)}
-                                onCheckedChange={() => toggleFamilyStudent(student.id)}
-                                disabled={student.id === payment.student_id}
-                              />
-                              <label
-                                htmlFor={student.id}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                              >
-                                {student.name} {student.admission_number ? `(${student.admission_number})` : ''} - {student.class_name}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
+                        <ScrollArea className="h-48 border rounded-md bg-background">
+                          <div className="p-2 space-y-1">
+                            {filteredFamilyStudents.map((student) => {
+                              const isSelected = selectedFamilyStudents.has(student.id);
+                              const isOriginal = student.id === payment.student_id;
+                              return (
+                                <div 
+                                  key={student.id} 
+                                  className={`flex items-center gap-3 p-3 rounded-md cursor-pointer transition-colors ${
+                                    isSelected 
+                                      ? "bg-primary/15 border border-primary/30" 
+                                      : "hover:bg-muted/50 border border-transparent"
+                                  } ${isOriginal ? "opacity-70" : ""}`}
+                                  onClick={() => !isOriginal && toggleFamilyStudent(student.id)}
+                                >
+                                  <Checkbox
+                                    id={student.id}
+                                    checked={isSelected}
+                                    onCheckedChange={() => toggleFamilyStudent(student.id)}
+                                    disabled={isOriginal}
+                                    className="h-5 w-5"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-base truncate">{student.name}</p>
+                                    <p className="text-sm text-muted-foreground font-semibold">
+                                      {student.admission_number || "No Adm. No."} • {student.class_name}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {filteredFamilyStudents.length === 0 && (
+                              <p className="text-center py-4 text-muted-foreground font-semibold">
+                                No students found
+                              </p>
+                            )}
+                          </div>
+                        </ScrollArea>
                       )}
+                      
+                      <p className="text-sm font-bold text-muted-foreground">
+                        {selectedFamilyStudents.size} student(s) selected
+                      </p>
                     </div>
                   </TabsContent>
                 </Tabs>
 
                 {/* Receipt Size */}
                 <div className="space-y-2">
-                  <Label>Receipt Size</Label>
+                  <Label className="text-base font-bold">Receipt Size (Paper Size)</Label>
                   <Select value={receiptSize} onValueChange={(v) => setReceiptSize(v as ReceiptSize)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="text-base font-semibold">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {Object.entries(RECEIPT_SIZES).map(([key, value]) => (
-                        <SelectItem key={key} value={key}>
+                        <SelectItem key={key} value={key} className="text-base font-medium">
                           {value.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    The PDF and print will use this exact paper size
+                  </p>
                 </div>
 
                 {/* Editable Fields */}
                 <div className="space-y-4 border-t pt-4">
-                  <h3 className="font-semibold text-sm">Editable Fields</h3>
+                  <h3 className="font-bold text-base">Editable Fields</h3>
                   
                   <div className="space-y-2">
-                    <Label>Date of Payment</Label>
+                    <Label className="font-semibold text-base">Date of Payment</Label>
                     <Input
                       value={paymentDate}
                       onChange={(e) => setPaymentDate(e.target.value)}
+                      className="text-base font-medium"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Amount in Words</Label>
+                    <Label className="font-semibold text-base">Amount in Words</Label>
                     <Input
                       value={amountInWords}
                       onChange={(e) => setAmountInWords(e.target.value)}
+                      className="text-base font-medium"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Notes (Optional)</Label>
+                    <Label className="font-semibold text-base">Notes (Optional)</Label>
                     <Textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Additional notes..."
                       rows={2}
+                      className="text-base font-medium"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Signature Label</Label>
+                    <Label className="font-semibold text-base">Signature Label</Label>
                     <Input
                       value={signatureLabel}
                       onChange={(e) => setSignatureLabel(e.target.value)}
+                      className="text-base font-medium"
                     />
                   </div>
                 </div>
@@ -451,26 +507,62 @@ export const ReceiptModal = ({
 
             {/* Right Panel - Preview */}
             <div className="flex flex-col">
-              <div className="text-sm text-muted-foreground mb-2 text-center">
-                Live Preview ({RECEIPT_SIZES[receiptSize].label})
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-base font-bold text-foreground">
+                  Receipt Preview
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPreview(!showPreview)}
+                  className="font-semibold"
+                >
+                  {showPreview ? (
+                    <>
+                      <EyeOff className="h-4 w-4 mr-2" />
+                      Hide Preview
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4 mr-2" />
+                      Show Preview
+                    </>
+                  )}
+                </Button>
               </div>
-              <div className="flex-1 flex items-start justify-center overflow-auto bg-muted/30 rounded-lg p-4">
-                <ReceiptPreview data={receiptData} size={receiptSize} />
-              </div>
+              
+              {showPreview ? (
+                <div className="flex-1 flex flex-col overflow-auto bg-muted/30 rounded-lg p-4">
+                  <div className="text-sm font-semibold text-muted-foreground mb-3 text-center">
+                    Paper Size: {RECEIPT_SIZES[receiptSize].label}
+                  </div>
+                  <div className="flex-1 flex items-start justify-center">
+                    <ReceiptPreview data={receiptData} size={receiptSize} />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center bg-muted/30 rounded-lg p-8 min-h-[300px]">
+                  <div className="text-center text-muted-foreground">
+                    <Eye className="h-16 w-16 mx-auto mb-4 opacity-40" />
+                    <p className="font-bold text-lg">Click "Show Preview" to see the receipt</p>
+                    <p className="text-sm font-medium mt-2">Preview will update in real-time as you make changes</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="font-semibold">
             <X className="h-4 w-4 mr-2" /> Close
           </Button>
-          <Button variant="outline" onClick={handleDownloadPDF}>
+          <Button variant="outline" onClick={handleDownloadPDF} className="font-semibold">
             <Download className="h-4 w-4 mr-2" /> Download PDF
           </Button>
-          <Button onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-2" /> Print
+          <Button onClick={handlePrint} className="font-bold">
+            <Printer className="h-4 w-4 mr-2" /> Print Receipt
           </Button>
         </div>
       </DialogContent>
