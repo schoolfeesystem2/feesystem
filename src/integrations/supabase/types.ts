@@ -101,6 +101,39 @@ export type Database = {
         }
         Relationships: []
       }
+      fee_targets: {
+        Row: {
+          created_at: string
+          id: string
+          target_amount: number
+          target_month: number | null
+          target_type: string
+          target_year: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          target_amount?: number
+          target_month?: number | null
+          target_type?: string
+          target_year: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          target_amount?: number
+          target_month?: number | null
+          target_type?: string
+          target_year?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -109,7 +142,9 @@ export type Database = {
           notes: string | null
           payment_date: string
           payment_method: string | null
+          payment_month: number | null
           payment_type: string | null
+          payment_year: number | null
           student_id: string
           user_id: string
         }
@@ -120,7 +155,9 @@ export type Database = {
           notes?: string | null
           payment_date?: string
           payment_method?: string | null
+          payment_month?: number | null
           payment_type?: string | null
+          payment_year?: number | null
           student_id: string
           user_id: string
         }
@@ -131,7 +168,9 @@ export type Database = {
           notes?: string | null
           payment_date?: string
           payment_method?: string | null
+          payment_month?: number | null
           payment_type?: string | null
+          payment_year?: number | null
           student_id?: string
           user_id?: string
         }

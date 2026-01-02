@@ -33,9 +33,14 @@ const Dashboard = () => {
     totalBalance: 0
   });
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
-  const [monthlyTarget, setMonthlyTarget] = useState(0);
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState("Dashboard");
+  
+  // Month/Year state for filtering
+  const currentDate = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  
   const [monthlyAnalysisData, setMonthlyAnalysisData] = useState<{
     month: string;
     collected: number;
@@ -53,7 +58,7 @@ const Dashboard = () => {
       fetchDashboardData();
       fetchSchoolName();
     }
-  }, [user]);
+  }, [user, selectedMonth, selectedYear]);
   const fetchSchoolName = async () => {
     try {
       const {
@@ -93,14 +98,18 @@ const Dashboard = () => {
       } = await supabase.from('students').select('id, class_id, classes(monthly_fee)').eq('status', 'active');
       if (studentsError) throw studentsError;
 
-      // Fetch payments
+      // Fetch payments for selected month/year
       const {
         data: payments,
         error: paymentsError
-      } = await supabase.from('payments').select('id, amount, payment_date, student_id, students(name)').order('payment_date', {
-        ascending: false
-      });
+      } = await supabase
+        .from('payments')
+        .select('id, amount, payment_date, payment_month, payment_year, student_id, students(name)')
+        .eq('payment_month', selectedMonth)
+        .eq('payment_year', selectedYear)
+        .order('payment_date', { ascending: false });
       if (paymentsError) throw paymentsError;
+      
       const totalStudents = students?.length || 0;
       const totalExpectedFees = students?.reduce((sum, s) => {
         const classData = s.classes as any;
@@ -114,11 +123,6 @@ const Dashboard = () => {
         totalCollectedFees,
         totalBalance: Math.max(0, totalBalance)
       });
-
-      // Set initial monthly target to expected fees
-      if (monthlyTarget === 0) {
-        setMonthlyTarget(totalExpectedFees);
-      }
 
       // Format recent payments
       const formattedPayments = payments?.slice(0, 5).map(p => ({
@@ -146,7 +150,36 @@ const Dashboard = () => {
         </div>
       </div>;
   }
+  const MONTHS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const currentMonthName = MONTHS[currentDate.getMonth()];
+  
   return <div className="space-y-6">
+      {/* Current Date Display */}
+      <Card className="bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
+        <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <Calendar className="h-6 w-6 text-primary" />
+            <div>
+              <p className="text-lg font-semibold">
+                {currentMonthName} {currentDate.getDate()}, {currentDate.getFullYear()}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Current Date
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">Viewing data for:</p>
+            <p className="font-semibold text-primary">
+              {MONTHS[selectedMonth - 1]} {selectedYear}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Header with Subscription Status */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -224,7 +257,14 @@ const Dashboard = () => {
       </div>
 
       {/* Monthly Target Card */}
-      <MonthlyTargetCard expectedFees={stats.totalExpectedFees} collectedFees={stats.totalCollectedFees} monthlyTarget={monthlyTarget} onTargetChange={setMonthlyTarget} />
+      <MonthlyTargetCard 
+        expectedFees={stats.totalExpectedFees} 
+        collectedFees={stats.totalCollectedFees} 
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
+        onMonthChange={setSelectedMonth}
+        onYearChange={setSelectedYear}
+      />
 
       {/* Collection Chart */}
       <CollectionChart onMonthlyDataChange={setMonthlyAnalysisData} />
