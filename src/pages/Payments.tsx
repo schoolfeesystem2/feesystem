@@ -73,11 +73,17 @@ const Payments = () => {
   const getPaymentMethodLabel = (value: string) =>
     paymentMethodOptions.find((o) => o.value === value)?.label ?? value;
 
+  const currentDate = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  
   const [formData, setFormData] = useState({
     student_id: "",
     amount: "",
     payment_method: "",
     notes: "",
+    payment_month: currentDate.getMonth() + 1,
+    payment_year: currentDate.getFullYear(),
   });
 
   useEffect(() => {
@@ -199,7 +205,15 @@ const Payments = () => {
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
 
   const resetForm = () => {
-    setFormData({ student_id: "", amount: "", payment_method: "", notes: "" });
+    const now = new Date();
+    setFormData({ 
+      student_id: "", 
+      amount: "", 
+      payment_method: "", 
+      notes: "",
+      payment_month: now.getMonth() + 1,
+      payment_year: now.getFullYear(),
+    });
     setSelectedClassId("");
     setEditingPayment(null);
     setStudentFeeInfo(null);
@@ -213,11 +227,14 @@ const Payments = () => {
       if (student?.class_id) {
         setSelectedClassId(student.class_id);
       }
+      const paymentDate = new Date(payment.payment_date);
       setFormData({
         student_id: payment.student_id,
         amount: payment.amount.toString(),
         payment_method: payment.payment_method,
         notes: payment.notes,
+        payment_month: paymentDate.getMonth() + 1,
+        payment_year: paymentDate.getFullYear(),
       });
     } else {
       resetForm();
@@ -259,6 +276,8 @@ const Payments = () => {
             amount: Number(formData.amount),
             payment_method: formData.payment_method,
             notes: formData.notes,
+            payment_month: formData.payment_month,
+            payment_year: formData.payment_year,
           })
           .eq('id', editingPayment.id);
 
@@ -272,6 +291,8 @@ const Payments = () => {
             amount: Number(formData.amount),
             payment_method: formData.payment_method,
             notes: formData.notes,
+            payment_month: formData.payment_month,
+            payment_year: formData.payment_year,
             user_id: user?.id,
           });
 
@@ -497,6 +518,59 @@ const Payments = () => {
                         </CardContent>
                       </Card>
                     )}
+
+                    {/* Month and Year Selection */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Payment Month *</Label>
+                        <Select 
+                          value={formData.payment_month.toString()} 
+                          onValueChange={(val) => setFormData({ ...formData, payment_month: parseInt(val) })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select month" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              { value: 1, label: "January" },
+                              { value: 2, label: "February" },
+                              { value: 3, label: "March" },
+                              { value: 4, label: "April" },
+                              { value: 5, label: "May" },
+                              { value: 6, label: "June" },
+                              { value: 7, label: "July" },
+                              { value: 8, label: "August" },
+                              { value: 9, label: "September" },
+                              { value: 10, label: "October" },
+                              { value: 11, label: "November" },
+                              { value: 12, label: "December" },
+                            ].map((month) => (
+                              <SelectItem key={month.value} value={month.value.toString()}>
+                                {month.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Payment Year *</Label>
+                        <Select 
+                          value={formData.payment_year.toString()} 
+                          onValueChange={(val) => setFormData({ ...formData, payment_year: parseInt(val) })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[2023, 2024, 2025, 2026, 2027].map((year) => (
+                              <SelectItem key={year} value={year.toString()}>
+                                {year}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
                     <div className="space-y-2">
                       <Label>Amount (KES) *</Label>
