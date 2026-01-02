@@ -18,6 +18,7 @@ import {
   numberToWords,
   generateReceiptPDF,
   getFontScale,
+  printReceipt,
 } from "@/lib/receiptUtils";
 import { ReceiptPreview } from "./ReceiptPreview";
 import { formatCurrency, formatDate } from "@/lib/formatters";
@@ -92,7 +93,7 @@ export const ReceiptModal = ({
   const [selectedFamilyStudents, setSelectedFamilyStudents] = useState<Set<string>>(new Set());
   const [loadingFamily, setLoadingFamily] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true); // Show preview by default
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -252,91 +253,7 @@ export const ReceiptModal = ({
 
   const handlePrint = () => {
     const receiptData = buildReceiptData();
-    const scale = getFontScale(receiptSize);
-    
-    const printContent = `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 100%; padding: 20px;">
-        <div style="text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 10px;">
-          <h1 style="margin: 0; font-size: ${18 * scale}px;">${receiptData.schoolName}</h1>
-          ${receiptData.schoolAddress ? `<p style="margin: 4px 0; font-size: ${12 * scale}px; color: #666;">${receiptData.schoolAddress}</p>` : ''}
-          ${receiptData.schoolPhone ? `<p style="margin: 4px 0; font-size: ${12 * scale}px; color: #666;">Tel: ${receiptData.schoolPhone}</p>` : ''}
-        </div>
-        <h2 style="text-align: center; font-size: ${16 * scale}px; margin: 15px 0;">PAYMENT RECEIPT</h2>
-        <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: 8px 0; font-size: ${12 * scale}px;">
-          <span><strong>Receipt No:</strong> ${receiptData.receiptNumber}</span>
-          <span><strong>Date:</strong> ${receiptData.paymentDate}</span>
-        </div>
-        <p style="font-size: ${12 * scale}px;"><strong>Payment Method:</strong> ${receiptData.paymentMethod}</p>
-        ${receiptData.students.length > 1 ? `<div style="text-align: center; background: #f5f5f5; padding: 8px; margin: 10px 0; font-weight: bold;">FAMILY RECEIPT - COMBINED PAYMENT</div>` : ''}
-        ${receiptData.students.length > 1 ? `
-          <table style="width: 100%; border-collapse: collapse; font-size: ${11 * scale}px; margin: 10px 0;">
-            <thead>
-              <tr style="border-bottom: 1px solid #ccc;">
-                <th style="text-align: left; padding: 8px 4px;">Student</th>
-                <th style="text-align: left; padding: 8px 4px;">Adm. No.</th>
-                <th style="text-align: left; padding: 8px 4px;">Class</th>
-                <th style="text-align: right; padding: 8px 4px;">Amount</th>
-                <th style="text-align: right; padding: 8px 4px;">Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${receiptData.students.map(s => `
-                <tr style="border-bottom: 1px solid #eee;">
-                  <td style="padding: 6px 4px;">${s.studentName}</td>
-                  <td style="padding: 6px 4px;">${s.admissionNumber || '-'}</td>
-                  <td style="padding: 6px 4px;">${s.className}</td>
-                  <td style="padding: 6px 4px; text-align: right;">KES ${s.amountPaid.toLocaleString()}</td>
-                  <td style="padding: 6px 4px; text-align: right;">KES ${s.balance.toLocaleString()}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        ` : `
-          <div style="font-size: ${12 * scale}px; margin: 15px 0;">
-            <p><strong>Student Name:</strong> ${receiptData.students[0]?.studentName}</p>
-            <p><strong>Admission No:</strong> ${receiptData.students[0]?.admissionNumber || 'N/A'}</p>
-            <p><strong>Class:</strong> ${receiptData.students[0]?.className}</p>
-          </div>
-        `}
-        <div style="border-top: 1px solid #ccc; padding-top: 10px; margin-top: 10px;">
-          <p style="font-size: ${14 * scale}px; font-weight: bold;">Amount Paid: KES ${receiptData.totalPaid.toLocaleString()}</p>
-          <p style="font-size: ${11 * scale}px;"><strong>In Words:</strong> ${receiptData.amountInWords} Shillings Only</p>
-          <p style="font-size: ${12 * scale}px;"><strong>Balance:</strong> KES ${receiptData.students.reduce((sum, s) => sum + s.balance, 0).toLocaleString()}</p>
-          ${receiptData.notes ? `<p style="font-size: ${11 * scale}px; color: #666;"><strong>Notes:</strong> ${receiptData.notes}</p>` : ''}
-        </div>
-        <div style="margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px;">
-          <div style="width: 200px; border-top: 1px solid #000; margin-top: 30px;">
-            <p style="font-size: ${10 * scale}px; color: #666; margin-top: 4px;">${receiptData.signatureLabel}</p>
-          </div>
-          <p style="text-align: center; color: #888; font-size: ${10 * scale}px; margin-top: 20px;">Thank you for your payment!</p>
-        </div>
-      </div>
-    `;
-
-    const dimensions = RECEIPT_SIZES[receiptSize];
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receipt - ${receiptData.receiptNumber}</title>
-          <style>
-            @page { size: ${dimensions.width}mm ${dimensions.height}mm; margin: 8mm; }
-            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
-          </style>
-        </head>
-        <body>
-          ${printContent}
-          <script>
-            window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    printReceipt(receiptData, receiptSize);
   };
 
   const handleDownloadPDF = () => {
