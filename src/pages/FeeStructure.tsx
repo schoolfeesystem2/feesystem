@@ -130,7 +130,7 @@ const FeeStructure = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.monthly_fee || !formData.academic_year || !formData.term) {
+    if (!formData.name || !formData.monthly_fee) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -361,34 +361,6 @@ const FeeStructure = () => {
                           onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })}
                           placeholder="5000"
                         />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Academic Year *</Label>
-                          <Select value={formData.academic_year} onValueChange={(val) => setFormData({ ...formData, academic_year: val })}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select year" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {yearOptions.map((year) => (
-                                <SelectItem key={year} value={year}>{year}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Term *</Label>
-                          <Select value={formData.term} onValueChange={(val) => setFormData({ ...formData, term: val })}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select term" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {TERMS.map((term) => (
-                                <SelectItem key={term} value={term}>{term}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
                       </div>
                     </div>
                     <DialogFooter>
