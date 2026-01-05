@@ -66,7 +66,7 @@ const Payments = () => {
   const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<Payment | null>(null);
   const [includesBus, setIncludesBus] = useState(false);
   
-  // Global bus charge from app_settings
+  // Bus charge from user's profile
   const [globalBusCharge, setGlobalBusCharge] = useState<number>(0);
 
   const paymentMethodOptions = [
@@ -105,13 +105,13 @@ const Payments = () => {
   const fetchGlobalBusCharge = async () => {
     try {
       const { data, error } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'bus_charge')
+        .from('profiles')
+        .select('bus_charge')
+        .eq('id', user?.id)
         .maybeSingle();
 
       if (error) throw error;
-      setGlobalBusCharge(data?.value ? parseFloat(data.value) : 0);
+      setGlobalBusCharge(data?.bus_charge ? Number(data.bus_charge) : 0);
     } catch (error) {
       console.error('Error fetching bus charge:', error);
     }
