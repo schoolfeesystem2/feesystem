@@ -18,7 +18,6 @@ interface FeeStructure {
   id: string;
   name: string;
   monthly_fee: number;
-  bus_fee: number;
   academic_year: string;
   term: string;
 }
@@ -40,24 +39,20 @@ const FeeStructure = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isBusDialogOpen, setIsBusDialogOpen] = useState(false);
   const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(null);
-  const [editingBusStructure, setEditingBusStructure] = useState<FeeStructure | null>(null);
   const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingStructureId, setDeletingStructureId] = useState<string | null>(null);
-  const [deleteType, setDeleteType] = useState<'fee' | 'bus'>('fee');
+
+  // Global bus charge state
+  const [globalBusCharge, setGlobalBusCharge] = useState<number>(0);
+  const [busChargeInput, setBusChargeInput] = useState("");
+  const [loadingBusCharge, setLoadingBusCharge] = useState(true);
 
   const [formData, setFormData] = useState({
     name: "",
     monthly_fee: "",
-    academic_year: new Date().getFullYear().toString(),
-    term: "Term 1",
-  });
-
-  const [busFormData, setBusFormData] = useState({
-    name: "",
-    bus_fee: "",
     academic_year: new Date().getFullYear().toString(),
     term: "Term 1",
   });
@@ -67,14 +62,35 @@ const FeeStructure = () => {
   useEffect(() => {
     if (user) {
       fetchFeeStructures();
+      fetchGlobalBusCharge();
     }
   }, [user]);
+
+  const fetchGlobalBusCharge = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'bus_charge')
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      const charge = data?.value ? parseFloat(data.value) : 0;
+      setGlobalBusCharge(charge);
+      setBusChargeInput(charge > 0 ? charge.toString() : "");
+    } catch (error) {
+      console.error('Error fetching bus charge:', error);
+    } finally {
+      setLoadingBusCharge(false);
+    }
+  };
 
   const fetchFeeStructures = async () => {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('id, name, monthly_fee, bus_fee, academic_year, term')
+        .select('id, name, monthly_fee, academic_year, term')
         .order('academic_year', { ascending: false })
         .order('term')
         .order('name');
@@ -98,16 +114,6 @@ const FeeStructure = () => {
     setEditingStructure(null);
   };
 
-  const resetBusForm = () => {
-    setBusFormData({ 
-      name: "", 
-      bus_fee: "",
-      academic_year: new Date().getFullYear().toString(),
-      term: "Term 1",
-    });
-    setEditingBusStructure(null);
-  };
-
   const handleOpenDialog = (structure?: FeeStructure) => {
     if (structure) {
       setEditingStructure(structure);
@@ -121,21 +127,6 @@ const FeeStructure = () => {
       resetForm();
     }
     setIsDialogOpen(true);
-  };
-
-  const handleOpenBusDialog = (structure?: FeeStructure) => {
-    if (structure) {
-      setEditingBusStructure(structure);
-      setBusFormData({
-        name: structure.name,
-        bus_fee: structure.bus_fee.toString(),
-        academic_year: structure.academic_year,
-        term: structure.term,
-      });
-    } else {
-      resetBusForm();
-    }
-    setIsBusDialogOpen(true);
   };
 
   const handleSave = async () => {
@@ -203,11 +194,11 @@ const FeeStructure = () => {
     }
   };
 
-  const handleSaveBus = async () => {
-    if (!busFormData.name || !busFormData.bus_fee) {
+  const handleSaveBusCharge = async () => {
+    if (!busChargeInput) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please enter a bus charge amount",
         variant: "destructive",
       });
       return;
@@ -215,49 +206,41 @@ const FeeStructure = () => {
 
     setSaving(true);
     try {
-      if (editingBusStructure) {
+      // Check if setting exists
+      const { data: existing } = await supabase
+        .from('app_settings')
+        .select('id')
+        .eq('key', 'bus_charge')
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing
         const { error } = await supabase
-          .from('classes')
-          .update({
-            bus_fee: Number(busFormData.bus_fee),
+          .from('app_settings')
+          .update({ 
+            value: busChargeInput,
+            updated_by: user?.id,
+            updated_at: new Date().toISOString()
           })
-          .eq('id', editingBusStructure.id);
+          .eq('key', 'bus_charge');
 
         if (error) throw error;
-        toast({ title: "Success", description: "Bus charges updated successfully" });
       } else {
-        // Find or create the class first
-        const existingClass = feeStructures.find(
-          f => f.name === busFormData.name && 
-          f.academic_year === busFormData.academic_year && 
-          f.term === busFormData.term
-        );
-
-        if (existingClass) {
-          // Update existing class with bus fee
-          const { error } = await supabase
-            .from('classes')
-            .update({
-              bus_fee: Number(busFormData.bus_fee),
-            })
-            .eq('id', existingClass.id);
-
-          if (error) throw error;
-        } else {
-          toast({
-            title: "Error",
-            description: "Please create a fee structure for this class first before adding bus charges.",
-            variant: "destructive",
+        // Insert new
+        const { error } = await supabase
+          .from('app_settings')
+          .insert({
+            key: 'bus_charge',
+            value: busChargeInput,
+            updated_by: user?.id,
           });
-          setSaving(false);
-          return;
-        }
-        toast({ title: "Success", description: "Bus charges added successfully" });
+
+        if (error) throw error;
       }
 
-      await fetchFeeStructures();
+      setGlobalBusCharge(parseFloat(busChargeInput));
+      toast({ title: "Success", description: "Bus charges updated successfully" });
       setIsBusDialogOpen(false);
-      resetBusForm();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -269,9 +252,8 @@ const FeeStructure = () => {
     }
   };
 
-  const handleDeleteClick = (id: string, type: 'fee' | 'bus') => {
+  const handleDeleteClick = (id: string) => {
     setDeletingStructureId(id);
-    setDeleteType(type);
     setDeleteDialogOpen(true);
   };
 
@@ -279,24 +261,13 @@ const FeeStructure = () => {
     if (!deletingStructureId) return;
     
     try {
-      if (deleteType === 'bus') {
-        // Just clear the bus fee, don't delete the class
-        const { error } = await supabase
-          .from('classes')
-          .update({ bus_fee: 0 })
-          .eq('id', deletingStructureId);
+      const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', deletingStructureId);
 
-        if (error) throw error;
-        toast({ title: "Success", description: "Bus charges removed successfully" });
-      } else {
-        const { error } = await supabase
-          .from('classes')
-          .delete()
-          .eq('id', deletingStructureId);
-
-        if (error) throw error;
-        toast({ title: "Success", description: "Fee structure deleted successfully" });
-      }
+      if (error) throw error;
+      toast({ title: "Success", description: "Fee structure deleted successfully" });
       await fetchFeeStructures();
     } catch (error: any) {
       toast({
@@ -311,7 +282,6 @@ const FeeStructure = () => {
   };
 
   const totalMonthlyFees = feeStructures.reduce((sum, f) => sum + f.monthly_fee, 0);
-  const busStructures = feeStructures.filter(f => f.bus_fee > 0);
 
   if (loading) {
     return (
@@ -357,10 +327,15 @@ const FeeStructure = () => {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Classes with Bus</CardTitle>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Bus className="h-4 w-4 text-amber-600" />
+                Global Bus Charge
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-600">{busStructures.length}</div>
+              <div className="text-2xl font-bold text-amber-600">
+                {loadingBusCharge ? "..." : formatCurrency(globalBusCharge)}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -480,7 +455,7 @@ const FeeStructure = () => {
                             <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(structure)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(structure.id, 'fee')}>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(structure.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
@@ -510,84 +485,56 @@ const FeeStructure = () => {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Bus className="h-5 w-5 text-amber-600" />
-                    Bus Charges Structure
+                    Bus Charges
                   </CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Set bus charges for students who use school transport
+                    Set a global bus charge that applies to all students who use school transport
                   </p>
                 </div>
                 <Dialog open={isBusDialogOpen} onOpenChange={setIsBusDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={() => handleOpenBusDialog()} variant="outline" className="border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20">
-                      <Plus className="h-4 w-4 mr-2" /> Add Bus Charges
+                    <Button 
+                      onClick={() => setBusChargeInput(globalBusCharge > 0 ? globalBusCharge.toString() : "")} 
+                      variant="outline" 
+                      className="border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" /> 
+                      {globalBusCharge > 0 ? "Edit Bus Charges" : "Set Bus Charges"}
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
                         <Bus className="h-5 w-5 text-amber-600" />
-                        {editingBusStructure ? "Edit Bus Charges" : "Add Bus Charges"}
+                        {globalBusCharge > 0 ? "Edit Bus Charges" : "Set Bus Charges"}
                       </DialogTitle>
                       <DialogDescription>
-                        {editingBusStructure ? "Update bus charges for this class" : "Add bus charges to an existing class"}
+                        Set the bus charge amount that will apply to all students who use school transport
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
-                        <Label>Select Class *</Label>
-                        <Select 
-                          value={busFormData.name} 
-                          onValueChange={(val) => {
-                            const selectedClass = feeStructures.find(f => f.name === val);
-                            if (selectedClass) {
-                              setBusFormData({ 
-                                ...busFormData, 
-                                name: val,
-                                academic_year: selectedClass.academic_year,
-                                term: selectedClass.term
-                              });
-                            }
-                          }}
-                          disabled={!!editingBusStructure}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select class" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {feeStructures
-                              .filter(f => editingBusStructure ? true : f.bus_fee === 0)
-                              .map((structure) => (
-                                <SelectItem key={structure.id} value={structure.name}>
-                                  {structure.name} ({structure.academic_year} - {structure.term})
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        {!editingBusStructure && (
-                          <p className="text-xs text-muted-foreground">
-                            Only classes without bus charges are shown
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-2">
                         <Label>Bus Charges (KES) *</Label>
                         <Input
                           type="number"
-                          value={busFormData.bus_fee}
-                          onChange={(e) => setBusFormData({ ...busFormData, bus_fee: e.target.value })}
+                          value={busChargeInput}
+                          onChange={(e) => setBusChargeInput(e.target.value)}
                           placeholder="2000"
                         />
+                        <p className="text-xs text-muted-foreground">
+                          This charge will be added to any student's fee when they use the bus
+                        </p>
                       </div>
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsBusDialogOpen(false)}>Cancel</Button>
-                      <Button onClick={handleSaveBus} disabled={saving} className="bg-amber-600 hover:bg-amber-700">
+                      <Button onClick={handleSaveBusCharge} disabled={saving} className="bg-amber-600 hover:bg-amber-700">
                         {saving ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Saving...
                           </>
-                        ) : editingBusStructure ? "Update" : "Add"}
+                        ) : "Save"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -595,48 +542,18 @@ const FeeStructure = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {busStructures.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Class</TableHead>
-                      <TableHead>Year</TableHead>
-                      <TableHead>Term</TableHead>
-                      <TableHead>Bus Charges</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {busStructures.map((structure) => (
-                      <TableRow key={structure.id}>
-                        <TableCell className="font-medium">{structure.name}</TableCell>
-                        <TableCell>{structure.academic_year}</TableCell>
-                        <TableCell>{structure.term}</TableCell>
-                        <TableCell className="text-amber-600 font-semibold">{formatCurrency(structure.bus_fee)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenBusDialog(structure)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(structure.id, 'bus')}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-12">
-                  <Bus className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Bus Charges</h3>
-                  <p className="text-muted-foreground mb-4">Add bus charges for classes that use school transport.</p>
-                  <Button onClick={() => handleOpenBusDialog()} variant="outline" className="border-amber-500 text-amber-600">
-                    <Plus className="h-4 w-4 mr-2" /> Add Bus Charges
-                  </Button>
+              <div className="text-center py-12">
+                <Bus className="h-16 w-16 text-amber-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Global Bus Charge</h3>
+                <div className="text-4xl font-bold text-amber-600 mb-4">
+                  {loadingBusCharge ? "Loading..." : formatCurrency(globalBusCharge)}
                 </div>
-              )}
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  {globalBusCharge > 0 
+                    ? "This amount will be added to the total fee for students who use the school bus when recording payments."
+                    : "Set a bus charge amount to enable bus fee collection for students who use school transport."}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -646,10 +563,8 @@ const FeeStructure = () => {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDeleteConfirm}
-        title={deleteType === 'bus' ? "Remove Bus Charges" : "Delete Fee Structure"}
-        description={deleteType === 'bus' 
-          ? "Are you sure you want to remove bus charges for this class?" 
-          : "Are you sure you want to delete this fee structure? This may affect students assigned to this class."}
+        title="Delete Fee Structure"
+        description="Are you sure you want to delete this fee structure? This may affect students assigned to this class."
       />
     </div>
   );
