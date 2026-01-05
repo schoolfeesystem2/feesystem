@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,6 +16,7 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { ReceiptModal } from "@/components/receipt/ReceiptModal";
+
 interface Payment {
   id: string;
   student_id: string;
@@ -60,10 +61,11 @@ const Payments = () => {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
-  const [studentFeeInfo, setStudentFeeInfo] = useState<{ totalFee: number; alreadyPaid: number; balance: number } | null>(null);
+  const [studentFeeInfo, setStudentFeeInfo] = useState<{ totalFee: number; busFee: number; alreadyPaid: number; balance: number } | null>(null);
   const [loadingFeeInfo, setLoadingFeeInfo] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<Payment | null>(null);
+  const [includesBus, setIncludesBus] = useState(false);
 
   const paymentMethodOptions = [
     { value: "cash", label: "Cash" },
@@ -86,11 +88,8 @@ const Payments = () => {
     notes: "",
     payment_month: currentDate.getMonth() + 1,
     payment_year: currentDate.getFullYear(),
-    payment_type: "tuition" as "tuition" | "bus" | "both",
+    payment_type: "school_fee" as "school_fee" | "bus" | "both",
   });
-
-  const [includeTuition, setIncludeTuition] = useState(true);
-  const [includeBus, setIncludeBus] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -114,25 +113,15 @@ const Payments = () => {
     }
   };
 
-  const fetchStudentFeeInfo = async (studentId: string, classId: string, incTuition: boolean, incBus: boolean) => {
+  const fetchStudentFeeInfo = async (studentId: string, classId: string, withBus: boolean) => {
     setLoadingFeeInfo(true);
     try {
-      // Get the class fee
       const selectedClass = classes.find(c => c.id === classId);
-      let totalFee = 0;
-      if (incTuition) totalFee += selectedClass?.monthly_fee || 0;
-      if (incBus) totalFee += selectedClass?.bus_fee || 0;
+      const schoolFee = selectedClass?.monthly_fee || 0;
+      const busFee = selectedClass?.bus_fee || 0;
+      const totalFee = schoolFee + (withBus ? busFee : 0);
 
-      // Get total payments for this student based on payment type
-      let paymentTypes: string[] = [];
-      if (incTuition && incBus) {
-        paymentTypes = ['tuition', 'bus', 'both'];
-      } else if (incTuition) {
-        paymentTypes = ['tuition', 'both'];
-      } else if (incBus) {
-        paymentTypes = ['bus', 'both'];
-      }
-
+      // Get total payments for this student
       const { data: paymentsData, error } = await supabase
         .from('payments')
         .select('amount, payment_type')
@@ -140,18 +129,10 @@ const Payments = () => {
 
       if (error) throw error;
 
-      // Calculate paid amount based on selected fee types
-      const alreadyPaid = paymentsData?.reduce((sum, p) => {
-        const pType = p.payment_type || 'tuition';
-        if (paymentTypes.includes(pType)) {
-          return sum + Number(p.amount);
-        }
-        return sum;
-      }, 0) || 0;
-      
+      const alreadyPaid = paymentsData?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
       const balance = totalFee - alreadyPaid;
 
-      setStudentFeeInfo({ totalFee, alreadyPaid, balance });
+      setStudentFeeInfo({ totalFee, busFee, alreadyPaid, balance });
     } catch (error) {
       console.error('Error fetching student fee info:', error);
       setStudentFeeInfo(null);
@@ -182,7 +163,7 @@ const Payments = () => {
           amount: p.amount,
           payment_date: p.payment_date,
           payment_method: p.payment_method || "cash",
-          payment_type: p.payment_type || "tuition",
+          payment_type: p.payment_type || "school_fee",
           notes: p.notes || "",
         };
       }) || [];
@@ -238,27 +219,24 @@ const Payments = () => {
       notes: "",
       payment_month: now.getMonth() + 1,
       payment_year: now.getFullYear(),
-      payment_type: "tuition",
+      payment_type: "school_fee",
     });
     setSelectedClassId("");
     setEditingPayment(null);
     setStudentFeeInfo(null);
-    setIncludeTuition(true);
-    setIncludeBus(false);
+    setIncludesBus(false);
   };
 
   const handleOpenDialog = (payment?: Payment) => {
     if (payment) {
       setEditingPayment(payment);
-      // Find the student to get their class_id
       const student = students.find(s => s.id === payment.student_id);
       if (student?.class_id) {
         setSelectedClassId(student.class_id);
       }
       const paymentDate = new Date(payment.payment_date);
-      const pType = payment.payment_type || 'tuition';
-      setIncludeTuition(pType === 'tuition' || pType === 'both');
-      setIncludeBus(pType === 'bus' || pType === 'both');
+      const pType = payment.payment_type || 'school_fee';
+      setIncludesBus(pType === 'bus' || pType === 'both');
       setFormData({
         student_id: payment.student_id,
         amount: payment.amount.toString(),
@@ -266,7 +244,7 @@ const Payments = () => {
         notes: payment.notes,
         payment_month: paymentDate.getMonth() + 1,
         payment_year: paymentDate.getFullYear(),
-        payment_type: pType as "tuition" | "bus" | "both",
+        payment_type: pType as "school_fee" | "bus" | "both",
       });
     } else {
       resetForm();
@@ -276,56 +254,32 @@ const Payments = () => {
 
   const handleClassChange = (classId: string) => {
     setSelectedClassId(classId);
-    setFormData({ ...formData, student_id: "" }); // Reset student selection when class changes
+    setFormData({ ...formData, student_id: "" });
     setStudentFeeInfo(null);
+    setIncludesBus(false);
   };
 
   const handleStudentChange = (studentId: string) => {
     setFormData({ ...formData, student_id: studentId });
     if (studentId && selectedClassId) {
-      fetchStudentFeeInfo(studentId, selectedClassId, includeTuition, includeBus);
+      fetchStudentFeeInfo(studentId, selectedClassId, includesBus);
     } else {
       setStudentFeeInfo(null);
     }
   };
 
-  const handleFeeTypeChange = (type: 'tuition' | 'bus', checked: boolean) => {
-    let newIncludeTuition = includeTuition;
-    let newIncludeBus = includeBus;
+  const handleBusToggle = (checked: boolean) => {
+    setIncludesBus(checked);
+    const newPaymentType = checked ? "both" : "school_fee";
+    setFormData({ ...formData, payment_type: newPaymentType });
     
-    if (type === 'tuition') {
-      newIncludeTuition = checked;
-      setIncludeTuition(checked);
-    } else {
-      newIncludeBus = checked;
-      setIncludeBus(checked);
-    }
-    
-    // At least one must be selected
-    if (!newIncludeTuition && !newIncludeBus) {
-      if (type === 'tuition') {
-        setIncludeBus(true);
-        newIncludeBus = true;
-      } else {
-        setIncludeTuition(true);
-        newIncludeTuition = true;
-      }
-    }
-    
-    // Update payment type
-    let paymentType: "tuition" | "bus" | "both" = "tuition";
-    if (newIncludeTuition && newIncludeBus) {
-      paymentType = "both";
-    } else if (newIncludeBus) {
-      paymentType = "bus";
-    }
-    setFormData({ ...formData, payment_type: paymentType });
-    
-    // Refresh fee info
     if (formData.student_id && selectedClassId) {
-      fetchStudentFeeInfo(formData.student_id, selectedClassId, newIncludeTuition, newIncludeBus);
+      fetchStudentFeeInfo(formData.student_id, selectedClassId, checked);
     }
   };
+
+  const selectedClass = classes.find(c => c.id === selectedClassId);
+  const hasBusCharges = selectedClass && selectedClass.bus_fee > 0;
 
   const handleSave = async () => {
     if (!selectedClassId || !formData.student_id || !formData.amount || !formData.payment_method) {
@@ -444,8 +398,24 @@ const Payments = () => {
     toast({ title: "Success", description: "Excel file downloaded successfully" });
   };
 
-  // Get selected student for display
   const selectedStudent = students.find(s => s.id === formData.student_id);
+
+  const getPaymentTypeLabel = (type: string) => {
+    switch (type) {
+      case 'bus': return 'Bus Only';
+      case 'both': return 'Fee + Bus';
+      case 'tuition': return 'School Fee'; // Legacy support
+      default: return 'School Fee';
+    }
+  };
+
+  const getPaymentTypeBadgeClass = (type: string) => {
+    switch (type) {
+      case 'bus': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+      case 'both': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
+      default: return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -568,32 +538,29 @@ const Payments = () => {
                             </div>
                           </div>
 
-                          {/* Fee Type Selection */}
-                          <div className="pt-2 border-t">
-                            <Label className="text-sm font-medium mb-2 block">Payment For:</Label>
-                            <div className="flex gap-4">
-                              <div className="flex items-center space-x-2">
-                                <Checkbox 
-                                  id="tuition" 
-                                  checked={includeTuition}
-                                  onCheckedChange={(checked) => handleFeeTypeChange('tuition', checked as boolean)}
+                          {/* Bus Option - Only show if class has bus charges */}
+                          {hasBusCharges && (
+                            <div className="pt-2 border-t">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Bus className="h-4 w-4 text-amber-600" />
+                                  <div>
+                                    <Label htmlFor="bus-toggle" className="text-sm font-medium cursor-pointer">
+                                      Student uses school bus
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                      Bus charges: {formatCurrency(selectedClass?.bus_fee || 0)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Switch
+                                  id="bus-toggle"
+                                  checked={includesBus}
+                                  onCheckedChange={handleBusToggle}
                                 />
-                                <label htmlFor="tuition" className="text-sm font-medium cursor-pointer">
-                                  Tuition Fee
-                                </label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Checkbox 
-                                  id="bus" 
-                                  checked={includeBus}
-                                  onCheckedChange={(checked) => handleFeeTypeChange('bus', checked as boolean)}
-                                />
-                                <label htmlFor="bus" className="text-sm font-medium cursor-pointer flex items-center gap-1">
-                                  <Bus className="h-3 w-3" /> Bus Charges
-                                </label>
                               </div>
                             </div>
-                          </div>
+                          )}
                           
                           {loadingFeeInfo ? (
                             <div className="text-sm text-muted-foreground">Loading fee info...</div>
@@ -601,7 +568,7 @@ const Payments = () => {
                             <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                               <div className="text-center">
                                 <span className="text-xs text-muted-foreground block">
-                                  {includeTuition && includeBus ? "Total (Tuition + Bus)" : includeBus ? "Bus Fee" : "Tuition Fee"}
+                                  {includesBus ? "Total (Fee + Bus)" : "School Fee"}
                                 </span>
                                 <p className="font-semibold text-sm">{formatCurrency(studentFeeInfo.totalFee)}</p>
                               </div>
@@ -750,14 +717,8 @@ const Payments = () => {
                       <TableCell className="font-mono text-sm">{payment.admission_number || "-"}</TableCell>
                       <TableCell className="font-medium">{payment.student_name}</TableCell>
                       <TableCell>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          payment.payment_type === 'bus' 
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
-                            : payment.payment_type === 'both' 
-                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                        }`}>
-                          {payment.payment_type === 'bus' ? 'Bus' : payment.payment_type === 'both' ? 'Tuition + Bus' : 'Tuition'}
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${getPaymentTypeBadgeClass(payment.payment_type)}`}>
+                          {getPaymentTypeLabel(payment.payment_type)}
                         </span>
                       </TableCell>
                       <TableCell className="text-success font-semibold">{formatCurrency(payment.amount)}</TableCell>
