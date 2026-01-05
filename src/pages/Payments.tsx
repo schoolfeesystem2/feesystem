@@ -42,7 +42,6 @@ interface Class {
   id: string;
   name: string;
   monthly_fee: number;
-  bus_fee: number;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -66,6 +65,9 @@ const Payments = () => {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<Payment | null>(null);
   const [includesBus, setIncludesBus] = useState(false);
+  
+  // Global bus charge from app_settings
+  const [globalBusCharge, setGlobalBusCharge] = useState<number>(0);
 
   const paymentMethodOptions = [
     { value: "cash", label: "Cash" },
@@ -96,14 +98,30 @@ const Payments = () => {
       fetchPayments();
       fetchStudents();
       fetchClasses();
+      fetchGlobalBusCharge();
     }
   }, [user]);
+
+  const fetchGlobalBusCharge = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'bus_charge')
+        .maybeSingle();
+
+      if (error) throw error;
+      setGlobalBusCharge(data?.value ? parseFloat(data.value) : 0);
+    } catch (error) {
+      console.error('Error fetching bus charge:', error);
+    }
+  };
 
   const fetchClasses = async () => {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('id, name, monthly_fee, bus_fee')
+        .select('id, name, monthly_fee')
         .order('name');
 
       if (error) throw error;
@@ -118,7 +136,7 @@ const Payments = () => {
     try {
       const selectedClass = classes.find(c => c.id === classId);
       const schoolFee = selectedClass?.monthly_fee || 0;
-      const busFee = selectedClass?.bus_fee || 0;
+      const busFee = globalBusCharge;
       const totalFee = schoolFee + (withBus ? busFee : 0);
 
       // Get total payments for this student
@@ -279,7 +297,7 @@ const Payments = () => {
   };
 
   const selectedClass = classes.find(c => c.id === selectedClassId);
-  const hasBusCharges = selectedClass && selectedClass.bus_fee > 0;
+  const hasBusCharges = globalBusCharge > 0;
 
   const handleSave = async () => {
     if (!selectedClassId || !formData.student_id || !formData.amount || !formData.payment_method) {
@@ -549,7 +567,7 @@ const Payments = () => {
                                       Student uses school bus
                                     </Label>
                                     <p className="text-xs text-muted-foreground">
-                                      Bus charges: {formatCurrency(selectedClass?.bus_fee || 0)}
+                                      Bus charges: {formatCurrency(globalBusCharge)}
                                     </p>
                                   </div>
                                 </div>
