@@ -69,6 +69,7 @@ export type Database = {
         Row: {
           academic_year: string
           annual_fee: number
+          bus_fee: number
           created_at: string
           id: string
           monthly_fee: number
@@ -80,6 +81,7 @@ export type Database = {
         Insert: {
           academic_year?: string
           annual_fee?: number
+          bus_fee?: number
           created_at?: string
           id?: string
           monthly_fee?: number
@@ -91,6 +93,7 @@ export type Database = {
         Update: {
           academic_year?: string
           annual_fee?: number
+          bus_fee?: number
           created_at?: string
           id?: string
           monthly_fee?: number
