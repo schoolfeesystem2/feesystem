@@ -69,14 +69,14 @@ const FeeStructure = () => {
   const fetchGlobalBusCharge = async () => {
     try {
       const { data, error } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'bus_charge')
+        .from('profiles')
+        .select('bus_charge')
+        .eq('id', user?.id)
         .maybeSingle();
 
       if (error) throw error;
       
-      const charge = data?.value ? parseFloat(data.value) : 0;
+      const charge = data?.bus_charge ? Number(data.bus_charge) : 0;
       setGlobalBusCharge(charge);
       setBusChargeInput(charge > 0 ? charge.toString() : "");
     } catch (error) {
@@ -206,37 +206,12 @@ const FeeStructure = () => {
 
     setSaving(true);
     try {
-      // Check if setting exists
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', 'bus_charge')
-        .maybeSingle();
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bus_charge: Number(busChargeInput) })
+        .eq('id', user?.id);
 
-      if (existing) {
-        // Update existing
-        const { error } = await supabase
-          .from('app_settings')
-          .update({ 
-            value: busChargeInput,
-            updated_by: user?.id,
-            updated_at: new Date().toISOString()
-          })
-          .eq('key', 'bus_charge');
-
-        if (error) throw error;
-      } else {
-        // Insert new
-        const { error } = await supabase
-          .from('app_settings')
-          .insert({
-            key: 'bus_charge',
-            value: busChargeInput,
-            updated_by: user?.id,
-          });
-
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       setGlobalBusCharge(parseFloat(busChargeInput));
       toast({ title: "Success", description: "Bus charges updated successfully" });
