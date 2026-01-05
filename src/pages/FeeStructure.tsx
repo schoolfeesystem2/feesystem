@@ -17,6 +17,7 @@ interface FeeStructure {
   id: string;
   name: string;
   monthly_fee: number;
+  bus_fee: number;
   academic_year: string;
   term: string;
 }
@@ -46,6 +47,7 @@ const FeeStructure = () => {
   const [formData, setFormData] = useState({
     name: "",
     monthly_fee: "",
+    bus_fee: "",
     academic_year: new Date().getFullYear().toString(),
     term: "Term 1",
   });
@@ -62,7 +64,7 @@ const FeeStructure = () => {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('id, name, monthly_fee, academic_year, term')
+        .select('id, name, monthly_fee, bus_fee, academic_year, term')
         .order('academic_year', { ascending: false })
         .order('term')
         .order('name');
@@ -80,6 +82,7 @@ const FeeStructure = () => {
     setFormData({ 
       name: "", 
       monthly_fee: "",
+      bus_fee: "",
       academic_year: new Date().getFullYear().toString(),
       term: "Term 1",
     });
@@ -92,6 +95,7 @@ const FeeStructure = () => {
       setFormData({
         name: structure.name,
         monthly_fee: structure.monthly_fee.toString(),
+        bus_fee: structure.bus_fee.toString(),
         academic_year: structure.academic_year,
         term: structure.term,
       });
@@ -119,6 +123,7 @@ const FeeStructure = () => {
           .update({
             name: formData.name,
             monthly_fee: Number(formData.monthly_fee),
+            bus_fee: Number(formData.bus_fee) || 0,
             academic_year: formData.academic_year,
             term: formData.term,
           })
@@ -137,6 +142,7 @@ const FeeStructure = () => {
           .insert({
             name: formData.name,
             monthly_fee: Number(formData.monthly_fee),
+            bus_fee: Number(formData.bus_fee) || 0,
             academic_year: formData.academic_year,
             term: formData.term,
             user_id: user?.id,
@@ -276,13 +282,23 @@ const FeeStructure = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Monthly Fee (KES) *</Label>
+                    <Label>Tuition Fee (KES) *</Label>
                     <Input
                       type="number"
                       value={formData.monthly_fee}
                       onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })}
                       placeholder="5000"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Bus Charges (KES)</Label>
+                    <Input
+                      type="number"
+                      value={formData.bus_fee}
+                      onChange={(e) => setFormData({ ...formData, bus_fee: e.target.value })}
+                      placeholder="0"
+                    />
+                    <p className="text-xs text-muted-foreground">Optional - Set if students use school transport</p>
                   </div>
                 </div>
                 <DialogFooter>
@@ -308,7 +324,8 @@ const FeeStructure = () => {
                   <TableHead>Class</TableHead>
                   <TableHead>Year</TableHead>
                   <TableHead>Term</TableHead>
-                  <TableHead>Monthly Fee</TableHead>
+                  <TableHead>Tuition Fee</TableHead>
+                  <TableHead>Bus Charges</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -319,6 +336,7 @@ const FeeStructure = () => {
                     <TableCell>{structure.academic_year}</TableCell>
                     <TableCell>{structure.term}</TableCell>
                     <TableCell className="text-primary font-semibold">{formatCurrency(structure.monthly_fee)}</TableCell>
+                    <TableCell className="text-amber-600 font-semibold">{formatCurrency(structure.bus_fee)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(structure)}>
