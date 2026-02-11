@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, DollarSign, TrendingUp, AlertCircle, Calendar, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Users, DollarSign, TrendingUp, AlertCircle, Calendar, Filter, ChevronRight, ChevronDown } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,7 +32,7 @@ const MONTHS = [
 ];
 
 type DatePreset = "last48h" | "lastWeek" | "lastMonth" | "month";
-const YEARS = Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - i);
+const YEARS = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + 2 - i);
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -146,26 +147,19 @@ const Dashboard = () => {
     }
   };
 
-  const [filterView, setFilterView] = useState<"main" | "months">("main");
-  const [browseYear, setBrowseYear] = useState(currentDate.getFullYear());
+  const [expandedYear, setExpandedYear] = useState<number | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  const handlePresetChange = (value: string) => {
-    if (value.startsWith("year-")) {
-      const year = parseInt(value.split("-")[1]);
-      setBrowseYear(year);
-      setFilterView("months");
-    } else {
-      setDatePreset(value as DatePreset);
-      setFilterView("main");
-    }
+  const selectPreset = (preset: DatePreset) => {
+    setDatePreset(preset);
+    setFilterOpen(false);
   };
 
-  const handleMonthSelect = (value: string) => {
-    const monthIndex = parseInt(value);
-    setSelectedYear(browseYear);
+  const selectMonth = (year: number, monthIndex: number) => {
+    setSelectedYear(year);
     setSelectedMonth(monthIndex + 1);
     setDatePreset("month");
-    setFilterView("main");
+    setFilterOpen(false);
   };
 
   const getFilterLabel = () => {
@@ -206,47 +200,42 @@ const Dashboard = () => {
         </div>
         <div className="flex items-center gap-3">
           <Filter className="h-4 w-4 text-muted-foreground" />
-         {filterView === "months" ? (
-            <Select
-              value=""
-              onValueChange={handleMonthSelect}
-            >
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder={`Pick month in ${browseYear}`} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="back" disabled className="text-xs text-muted-foreground font-semibold">
-                  ← {browseYear}
-                </SelectItem>
-                {MONTHS.map((month, mi) => (
-                  <SelectItem key={mi} value={`${mi}`}>
-                    {month}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Select
-              value={datePreset === "month" ? `selected-month` : datePreset}
-              onValueChange={handlePresetChange}
-            >
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Select period">
-                  {getFilterLabel()}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="last48h">Last 48 Hours</SelectItem>
-                <SelectItem value="lastWeek">Last Week</SelectItem>
-                <SelectItem value="lastMonth">Last 30 Days</SelectItem>
-                {YEARS.map(year => (
-                  <SelectItem key={year} value={`year-${year}`}>
-                    📅 {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+         <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[220px] justify-between">
+                {getFilterLabel()}
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-1 max-h-[320px] overflow-y-auto" align="end">
+              <button onClick={() => selectPreset("last48h")} className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-accent">Last 48 Hours</button>
+              <button onClick={() => selectPreset("lastWeek")} className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-accent">Last Week</button>
+              <button onClick={() => selectPreset("lastMonth")} className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-accent">Last 30 Days</button>
+              <div className="my-1 h-px bg-border" />
+              {YEARS.map(year => (
+                <div key={year}>
+                  <button
+                    onClick={() => setExpandedYear(prev => prev === year ? null : year)}
+                    className="w-full text-left px-3 py-2 text-sm font-semibold rounded-md hover:bg-accent flex items-center gap-1"
+                  >
+                    <ChevronRight className={`h-3 w-3 transition-transform ${expandedYear === year ? 'rotate-90' : ''}`} />
+                    {year}
+                  </button>
+                  {expandedYear === year && MONTHS.map((month, mi) => (
+                    <button
+                      key={mi}
+                      onClick={() => selectMonth(year, mi)}
+                      className={`w-full text-left pl-8 pr-3 py-1.5 text-sm rounded-md hover:bg-accent ${
+                        datePreset === "month" && selectedYear === year && selectedMonth === mi + 1 ? 'bg-primary/10 text-primary font-medium' : ''
+                      }`}
+                    >
+                      {month}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </PopoverContent>
+          </Popover>
         </div>
       </CardContent>
     </Card>
