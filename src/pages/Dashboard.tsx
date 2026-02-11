@@ -147,10 +147,12 @@ const Dashboard = () => {
 
   const handlePresetChange = (value: string) => {
     if (value.startsWith("month-")) {
-      // Format: month-<monthIndex> (0-based)
-      const monthIndex = parseInt(value.split("-")[1]);
+      // Format: month-<year>-<monthIndex> (0-based)
+      const parts = value.split("-");
+      const year = parseInt(parts[1]);
+      const monthIndex = parseInt(parts[2]);
+      setSelectedYear(year);
       setSelectedMonth(monthIndex + 1);
-      setSelectedYear(currentDate.getFullYear());
       setDatePreset("month");
     } else {
       setDatePreset(value as DatePreset);
@@ -195,22 +197,25 @@ const Dashboard = () => {
         </div>
         <div className="flex items-center gap-3">
           <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select
-            value={datePreset === "month" ? `month-${selectedMonth - 1}` : datePreset}
+         <Select
+            value={datePreset === "month" ? `month-${selectedYear}-${selectedMonth - 1}` : datePreset}
             onValueChange={handlePresetChange}
           >
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[300px]">
               <SelectItem value="last48h">Last 48 Hours</SelectItem>
               <SelectItem value="lastWeek">Last Week</SelectItem>
               <SelectItem value="lastMonth">Last 30 Days</SelectItem>
-              {MONTHS.map((month, i) => (
-                <SelectItem key={i} value={`month-${i}`}>
-                  {month} {currentDate.getFullYear()}
-                </SelectItem>
-              ))}
+              {Array.from({ length: 3 }, (_, yi) => {
+                const year = currentDate.getFullYear() - yi;
+                return MONTHS.map((month, mi) => (
+                  <SelectItem key={`${year}-${mi}`} value={`month-${year}-${mi}`}>
+                    {month} {year}
+                  </SelectItem>
+                ));
+              }).flat()}
             </SelectContent>
           </Select>
         </div>
