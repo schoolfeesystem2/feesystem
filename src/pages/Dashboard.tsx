@@ -31,6 +31,7 @@ const MONTHS = [
 ];
 
 type DatePreset = "last48h" | "lastWeek" | "lastMonth" | "month";
+const YEARS = Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - i);
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -145,18 +146,26 @@ const Dashboard = () => {
     }
   };
 
+  const [filterView, setFilterView] = useState<"main" | "months">("main");
+  const [browseYear, setBrowseYear] = useState(currentDate.getFullYear());
+
   const handlePresetChange = (value: string) => {
-    if (value.startsWith("month-")) {
-      // Format: month-<year>-<monthIndex> (0-based)
-      const parts = value.split("-");
-      const year = parseInt(parts[1]);
-      const monthIndex = parseInt(parts[2]);
-      setSelectedYear(year);
-      setSelectedMonth(monthIndex + 1);
-      setDatePreset("month");
+    if (value.startsWith("year-")) {
+      const year = parseInt(value.split("-")[1]);
+      setBrowseYear(year);
+      setFilterView("months");
     } else {
       setDatePreset(value as DatePreset);
+      setFilterView("main");
     }
+  };
+
+  const handleMonthSelect = (value: string) => {
+    const monthIndex = parseInt(value);
+    setSelectedYear(browseYear);
+    setSelectedMonth(monthIndex + 1);
+    setDatePreset("month");
+    setFilterView("main");
   };
 
   const getFilterLabel = () => {
@@ -197,27 +206,47 @@ const Dashboard = () => {
         </div>
         <div className="flex items-center gap-3">
           <Filter className="h-4 w-4 text-muted-foreground" />
-         <Select
-            value={datePreset === "month" ? `month-${selectedYear}-${selectedMonth - 1}` : datePreset}
-            onValueChange={handlePresetChange}
-          >
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
-              <SelectItem value="last48h">Last 48 Hours</SelectItem>
-              <SelectItem value="lastWeek">Last Week</SelectItem>
-              <SelectItem value="lastMonth">Last 30 Days</SelectItem>
-              {Array.from({ length: 3 }, (_, yi) => {
-                const year = currentDate.getFullYear() - yi;
-                return MONTHS.map((month, mi) => (
-                  <SelectItem key={`${year}-${mi}`} value={`month-${year}-${mi}`}>
-                    {month} {year}
+         {filterView === "months" ? (
+            <Select
+              value=""
+              onValueChange={handleMonthSelect}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder={`Pick month in ${browseYear}`} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="back" disabled className="text-xs text-muted-foreground font-semibold">
+                  ← {browseYear}
+                </SelectItem>
+                {MONTHS.map((month, mi) => (
+                  <SelectItem key={mi} value={`${mi}`}>
+                    {month}
                   </SelectItem>
-                ));
-              }).flat()}
-            </SelectContent>
-          </Select>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select
+              value={datePreset === "month" ? `selected-month` : datePreset}
+              onValueChange={handlePresetChange}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Select period">
+                  {getFilterLabel()}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="last48h">Last 48 Hours</SelectItem>
+                <SelectItem value="lastWeek">Last Week</SelectItem>
+                <SelectItem value="lastMonth">Last 30 Days</SelectItem>
+                {YEARS.map(year => (
+                  <SelectItem key={year} value={`year-${year}`}>
+                    📅 {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </CardContent>
     </Card>
